@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate,useParams } from "react-router-dom";
 
 import { FormCard } from "../components";
 import { useForm } from "react-hook-form";
@@ -8,22 +8,48 @@ import { setToLocalForage } from "../forms";
 import { Select, Option } from "@material-tailwind/react";
 
 import { FaAngleRight } from "react-icons/fa";
-import { MdFilterList } from "react-icons/md";
+import { Switch, Tooltip } from "@material-tailwind/react";
 
-import { formService } from "../services";
+import { formService , applicationService} from "../services";
 import { getCookie } from "../utils";
 import APPLICANT_ROUTE_MAP from "../routes/ApplicantRoute";
 
 const AllApplications = () => {
+
+  const { round, courseType } = useParams();
   const [loadingForms, setLoadingForms] = useState(false);
+  
+  const [switchDisabled, setSwitchDisabled] = useState(true);
+  const [defaultChecked, setDefaultChecked] = useState(false);
+  const [selectedRound, setSelectedRound] = useState(round);
+  
   const [value, setValue] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState("false");
+  const [courseTypeOptions, setCourseTypeOptions] = useState([]);
+
+
+
   const [formData, setFormData] = useState({
     condition: {
-      _and: { form: {} },
+      _and: { form: {
+        "form_status": {
+          "_eq": "Published"
+        },
+        "_and": {
+          "course_type": {
+            "_eq": courseType
+          }
+        }
+      } },
       assignee: { _eq: "applicant" },
-    },
+      round: {
+        _eq: selectedRound
+      }
+    }
   });
+ 
+
+
   const [availableForms, setAvailableForms] = useState([]);
   const instituteDetails = getCookie("institutes");
   const navigate = useNavigate();
@@ -33,12 +59,15 @@ const AllApplications = () => {
       condition: {
         ...formData.condition,
         [name]: {
-          _eq: value,
+          _eq: value
         },
         assignee: {
-          _eq: "applicant",
+          _eq: "applicant"
         },
-      },
+        round: {
+          _eq: selectedRound
+        }
+      }
     });
   };
 
@@ -50,11 +79,19 @@ const AllApplications = () => {
     //   offsetNo: 0,
     // }));
 
-    const postData = { searchString: `%${value}%` };
+    const postData = {searchString:{_or:[{course_name:{_ilike:`%${value}%`}}],
+    _and:{round:{_eq:selectedRound},course_type:{_eq:courseType},
+    assignee:{_eq:"applicant"},form: {form_status:{_eq: "Published"}}
+  }
+}}
+
+
+    //const postData = { searchString: `%${value}%` };
     if (value.trim() == "" || value.trim().length >= 3) {
       let formsResponse = await formService.searchForm(postData);
       if (formsResponse?.data?.courses) {
         setAvailableForms(formsResponse?.data?.courses);
+      //  checkAvailableFormsToShow(selectedRound);
       }
     }
   };
@@ -67,6 +104,47 @@ const AllApplications = () => {
     setLoadingForms(false);
   };
 
+
+  const checkAvailableFormsToShow = async (roundSelected) => {
+
+    const requestPayload = {
+      "round": roundSelected,
+      "applicant_id": instituteDetails?.[0].id,
+      "noc_path": true
+      // NOTE:   "noc_path"=  true returns the forms for which
+         //    no noc is generated for this applicant_id for given round 
+    }
+    const formsToOmitResp = await applicationService.formsToOmit(
+      requestPayload
+    );
+
+    const formsToOmit = formsToOmitResp?.data?.form_submissions
+    if (formsToOmitResp?.data?.form_submissions) {
+      const courseIdsToOmit = [];
+      for (let i = 0; i < formsToOmit.length; i++) {
+        courseIdsToOmit.push(availableForms?.filter((el) => {
+          if (el?.form.form_id === formsToOmit[i].course?.form?.form_id) {
+            return el.course_id
+          }
+        }))
+      }
+      const unique = [...new Set(courseIdsToOmit.flat().map((item) => item?.course_id))];
+      for (let i = 0; i < unique.length; i++) {
+        setAvailableForms(availableForms?.filter(object => {
+          return object?.course_id !== unique[i];
+        }));
+      }
+
+     // setAvailableForms(rrr?.slice(0,4))
+    }
+  /*   applications.forEach((item, index) => {
+     // console.log(item)
+      if (item.noc_Path !== null && item.round === 1) {
+        setSwitchDisabled(false)
+      } 
+    }); */
+  }
+
   const applyFormHandler = async (obj) => {
     await setToLocalForage("course_details", obj);
     let form_obj = obj?.formObject;
@@ -78,19 +156,124 @@ const AllApplications = () => {
     navigate(`${APPLICANT_ROUTE_MAP.dashboardModule.createForm}/${file_name}`);
   };
 
+/*   {"condition": {"round": {"_eq": 1}, 
+  "course_type": {"_eq": "Nursing"}, 
+  "course_level": {"_eq": "Degree"}, "assignee": {"_eq": "on-ground_assessor"},
+   "application_type": {"_eq": "new_institute"},
+    "form": {"labels": {"_eq": "infrastructure"}}}} */
+
   const handleClearFilter = () => {
     setFormData({
       condition: {
-        assignee: {
-          _eq: "applicant",
-        },
-      },
+        _and: { form: {
+          "form_status": {
+            "_eq": "Published"
+          },
+          "_and": {
+            "course_type": {
+              "_eq": courseType
+            }
+          }
+        } },
+        assignee: { _eq: "applicant" },
+        round: {
+          _eq: selectedRound
+        }
+      }
     });
   };
 
   useEffect(() => {
+   // console.log("courseTypecourseType from url",courseType)
+    //courseTypeOptions.push(courseType)
+    setCourseTypeOptions([courseType])
+    round === "1" ?   setSelectedRound("1") :  setSelectedRound("2");
+  }, []);
+
+  useEffect(() => {
+    
     getAvailableForms();
-  }, [formData]);
+    if(round === "1"){
+      setSwitchDisabled(true);
+      setDefaultChecked(false);
+    } else {
+      setSwitchDisabled(false);
+      setDefaultChecked(true);
+    }
+  }, [selectedRound,formData,]);
+
+  useEffect(() => {
+    checkAvailableFormsToShow(selectedRound);
+  }, [availableForms]);
+
+/*   useEffect(() => {
+    checkAvailableFormsToShow();
+  }, [applications]);
+
+  const checkAvailableFormsToShow = async () => {
+
+    if (!instituteDetails || !instituteDetails?.length) {
+      return;
+    }
+
+    setLoadingApplications(true);
+    let round=1 ;
+    applications.forEach((item, index) => {
+      console.log(item)
+      if (item.noc_Path !== null && item.round === 1) {
+        round=2
+      } 
+    });
+    setSelectedRound(round)
+    setLoadingApplications(false);
+  } */
+
+  const handleToggleChange = (e) => {
+    console.log("e.target.checkede.target.checked",e.target.checked)
+    if(e.target.checked){
+     // getAvailableForms();
+     setFormData({
+      condition: {
+        _and: { form: {
+          "form_status": {
+            "_eq": "Published"
+          },
+          "_and": {
+            "course_type": {
+              "_eq": courseType
+            }
+          }
+        } },
+        assignee: { _eq: "applicant" },
+        round: {
+          _eq: 2
+        }
+      }
+    });
+      setSelectedRound("2")
+    } else {
+     // getAvailableForms();
+     setFormData({
+      condition: {
+        _and: { form: {
+          "form_status": {
+            "_eq": "Published"
+          },
+          "_and": {
+            "course_type": {
+              "_eq": courseType
+            }
+          }
+        } },
+        assignee: { _eq: "applicant" },
+        round: {
+          _eq: 1
+        }
+      }
+    });
+     setSelectedRound("1");
+    }
+  }
 
   return (
     <>
@@ -111,7 +294,7 @@ const AllApplications = () => {
       <div className="container mx-auto py-12 px-3 min-h-[40vh]">
         <div className="flex flex-col gap-4">
           <div className="flex mb-12 justify-between grid grid-cols-10 gap-x-5 gap-y-8 sm:grid-cols-10">
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-4">
               <Select
                 name="application_type"
                 id="application_type"
@@ -130,7 +313,7 @@ const AllApplications = () => {
                 </Option>
               </Select>
             </div>
-            <div className="sm:col-span-3 ">
+          {/*   <div className="sm:col-span-3 ">
               <Select
                 name="course_type"
                 id="course_type"
@@ -140,11 +323,13 @@ const AllApplications = () => {
                 size="lg"
                 label="Course Type"
               >
-                <Option value="Nursing">Nursing</Option>
-                <Option value="Paramedical">Paramedical</Option>
+               
+                {courseTypeOptions.map((option, index) => (
+                  <option key={index} value={option}>{option}</option>
+                ))}
               </Select>
-            </div>
-            <div className="sm:col-span-3 ">
+            </div> */}
+            <div className="sm:col-span-4 ">
               <Select
                 name="course_level"
                 id="course_level"
@@ -170,6 +355,19 @@ const AllApplications = () => {
 
           <div className="flex flex-col gap-3">
             <div className="text-xl font-semibold">Application forms</div>
+            <div>
+            <Tooltip content="Round 2 forms are only applicable for applicants who have received NOC for Round 1 forms">
+            <Switch
+                    id="show-with-errors"
+                    label={<span className="text-sm">Show Round 2 forms</span>}
+                    onChange={handleToggleChange}
+                    disabled={switchDisabled}
+                    defaultChecked={defaultChecked}
+                  />
+            </Tooltip>
+            
+            </div>
+          
             {!loadingForms && availableForms.length === 0 && (
               <div className="text-sm">There is no form available</div>
             )}
@@ -204,7 +402,7 @@ const AllApplications = () => {
               {availableForms.map((form, index) => (
                 <FormCard form={form} key={index} onApply={applyFormHandler} />
               ))}
-              {console.log("available forms-", availableForms)}
+             {/*  {console.log("available forms-", availableForms)} */}
             </div>
           )}
         </div>

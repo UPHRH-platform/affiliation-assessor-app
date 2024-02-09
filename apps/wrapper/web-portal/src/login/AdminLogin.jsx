@@ -22,6 +22,7 @@ const AdminLogin = () => {
   const {
     register,
     handleSubmit,
+    resetField,
     formState: { errors },
   } = useForm();
 
@@ -42,11 +43,7 @@ const AdminLogin = () => {
 
   const login = async (data) => {
     try {
-      // const loginDetails = { username: data.email };
-      // const checkUser = await userService.login(loginDetails);
-      // console.log("user check", checkUser.data.user.email);
-      // if (checkUser.data.user.email) {
-      // console.log(checkUser.data.user.email);
+
       const otpRes = await userService.generateOtp({
         username: data.email,
       });
@@ -56,26 +53,15 @@ const AdminLogin = () => {
         // setPhoneNumber(data.phone);
         setEmailId(data.email);
       } else {
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: otpRes?.data?.error ? otpRes?.data?.error : "Something went wrong",
+          toastType: "error",
+        }));
         console.log("Something went wrong", otpRes);
       }
-      // } else {
-      //   setToast((prevState) => ({
-      //     ...prevState,
-      //     toastOpen: true,
-      //     toastMsg: "User not registered.",
-      //     toastType: "error",
-      //   }));
-      //   setTimeout(
-      //     () =>
-      //       setToast((prevState) => ({
-      //         ...prevState,
-      //         toastOpen: false,
-      //         toastMsg: "",
-      //         toastType: "",
-      //       })),
-      //     3000
-      //   );
-      // }
+
     } catch (error) {
       setToast((prevState) => ({
         ...prevState,
@@ -87,6 +73,35 @@ const AdminLogin = () => {
     }
   };
 
+  const isUserActive = async (data) => {
+    setSpinner(true);
+    try {
+      const res = await userService.isUserActive(data);
+      if (res?.data[0]?.enabled && ( res?.data[0]?.attributes.Role[0] !== "Institute" && res?.data[0]?.attributes.Role[0] !== "Assessor") ) {
+        login(data);
+        setSpinner(false);
+      } else {
+        setSpinner(false);
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: "User not found. Please contact system admin.",
+          toastType: "error",
+        }));
+      }
+      
+    } catch (error) {
+      setSpinner(false);
+      setToast((prevState) => ({
+        ...prevState,
+        toastOpen: true,
+        toastMsg: "Something went wrong. Please try again later. ",
+        toastType: "error",
+      }));
+    }
+   
+  }
+
   const verifyOtp = async (data) => {
     try {
       setSpinner(true);
@@ -97,27 +112,45 @@ const AdminLogin = () => {
 
       const loginRes = await userService.login(loginDetails);
       console.log(loginRes);
-      // const verifyOtpReq = userService.verifyOtp(data.email, data.otp);
-      // const fusionAuthLoginReq = from(verifyOtpReq).pipe(
-      //   mergeMap((verifyOtpRes) => {
-      //     if (verifyOtpRes.data.data.Status === "Error") {
-      //       setVerifyEnteredOtp(false);
-      //     } else {
-      //       setVerifyEnteredOtp(true);
-      //       return userService.login(loginDetails);
-      //     }
-      //   })
-      // );
-      let user_details = loginRes?.data?.userRepresentation;
+      if (loginRes?.data?.error) {
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: "Enter the correct OTP.",
+          toastType: "error",
+        }));
+        return;
+      }
+
+  
+
+      const user_details = loginRes?.data?.userRepresentation;
+      console.log(loginRes?.data)
+      setCookie("userData", user_details);
+      
       const adminDetailsRes = await getRegulator({
         user_id: user_details?.id,
       });
-      const role = loginRes?.data?.userRepresentation?.attributes?.Role?.[0];
+     //let role = loginRes?.data?.userRepresentation?.attributes?.Role[0]; ///comment this line when using uat env
+      const role = loginRes?.data?.userRepresentation?.attributes?.Role[0]; ///comment this line when using in dev env 
+    /*  let role;
+     if((window.location.host.includes("regulator.upsmfac")) || (window.location.host.includes("localhost"))){
+           role = loginRes?.data?.userRepresentation?.attributes?.Role[0]; /// dev env 
+    
+     } else {
+           role = loginRes?.data?.userRepresentation?.attributes?.Role[0]; /// uat env
+  
+     } */
+     
+     console.log(role)
+      setCookie("regulator", adminDetailsRes.data.regulator);
       if (role === "Super-Admin" || role === "Desktop-Admin") {
-        setCookie("userData", loginRes.data);
-        setCookie("regulator", adminDetailsRes.data.regulator);
         navigate(ADMIN_ROUTE_MAP.adminModule.manageUsers.home);
-      } else {
+      }
+      else if (role === "Desktop-Assessor") {
+        navigate(ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home);
+      }
+      else {
         setToast((prevState) => ({
           ...prevState,
           toastOpen: true,
@@ -129,27 +162,31 @@ const AdminLogin = () => {
       //setting device ID
       if (getCookie("firebase_client_token") !== undefined) {
         await updateRegulatorDeviceId({
-          user_id: getCookie("userData")?.userRepresentation?.id,
+          user_id: getCookie("userData")?.id,
           device_id: JSON.stringify([getCookie("firebase_client_token")]),
         });
       }
     } catch (error) {
+      console.log(
+        "some error @ login", error);
       setToast((prevState) => ({
         ...prevState,
         toastOpen: true,
-        toastMsg: "Enter the correct OTP.",
+        toastMsg: "Something went wrong. Please try again later.",
         toastType: "error",
       }));
-      console.log(
-        "Otp veriification and login failed due to some error",
-        error
-      );
+
       removeCookie("regulator");
       removeCookie("userData");
     } finally {
       setSpinner(false);
     }
   };
+
+  const handleBackClick = () => {
+    setEnableOtp(false);
+    resetField("otp");
+  }
 
   if (!isLoggedIn) {
     return (
@@ -162,7 +199,8 @@ const AdminLogin = () => {
               <>
                 <form
                   onSubmit={handleSubmit((data) => {
-                    login(data);
+                   // login(data);
+                   isUserActive(data)
                   })}
                   noValidate
                 >
@@ -276,11 +314,11 @@ const AdminLogin = () => {
                         Please enter the correct OTP
                       </div>
                     )}
-                    {toast.toastOpen && (
+                    {/*  {toast.toastOpen && (
                       <div className="text-red-500 mt-2 text-sm">
                         You are not a registered admin.
                       </div>
-                    )}
+                    )} */}
                   </div>
                   <Button
                     moreClass="uppercase text-white w-full mt-7"
@@ -290,9 +328,7 @@ const AdminLogin = () => {
                   <div className="flex justify-center my-6">
                     <span
                       className="text-primary-700 cursor-pointer"
-                      onClick={() => {
-                        setEnableOtp(false);
-                      }}
+                      onClick={handleBackClick}
                     >
                       Go back, re-enter the email id
                     </span>

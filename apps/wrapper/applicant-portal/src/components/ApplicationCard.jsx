@@ -2,8 +2,11 @@ import React, { useEffect } from "react";
 import { Card, Button } from "./index";
 import { generate_uuidv4, getCookie, readableDate, removeCookie, setCookie } from "../utils";
 import { applicantService } from "../services";
-import { useNavigate } from "react-router-dom";
+import paymentConfigPostData from '../payment-config/config.json';
 
+import {
+  setToLocalForage,
+} from "./../forms";
 const ApplicationCard = (props) => {
   let formName = props?.application?.course?.course_name?.trim() || "NA";
 
@@ -13,7 +16,7 @@ const ApplicationCard = (props) => {
     setCookie("payment_ref_no",refNo)
     const instituteDetails = getCookie("institutes");
     const instituteId = instituteDetails?.[0]?.id;
-    const postData = {
+    /* const postData = {
       endpoint: "https://eazypayuat.icicibank.com/EazyPG",
       returnUrl: "https://payment.uphrh.in/api/v1/user/payment",
       paymode: "9",
@@ -39,10 +42,24 @@ const ApplicationCard = (props) => {
         refundStatus: "x",
       },
       optionalFields: "",
-    };
+    }; */
     try {
-      const paymentRes = await applicantService.initiatePayment(postData);
-      await window.open(paymentRes?.data?.redirectUrl);
+      const paymentRes = await applicantService.initiatePayment(paymentConfigPostData);
+      //await applicantService.savePaymentRefNumber(paymentRes?.data?.referenceNo);
+      await setToLocalForage(
+        `refNo`,
+        {
+          refNo: paymentRes?.data?.referenceNo
+        }
+      );
+      
+      await setToLocalForage(
+        `common_payload`,
+        {
+          "paymentStage":"secStage",
+        }
+      );
+       window.open(paymentRes?.data?.redirectUrl);
     } catch (error) {}
   };
 
@@ -50,9 +67,9 @@ const ApplicationCard = (props) => {
     <Card moreClass="flex flex-col border-gray-100 m-3 gap-5 w-[360px] border-[1px] drop-shadow justify-between">
       <div className="flex flex-col gap-2">
         <div className="text-xl font-medium">{formName}</div>
-        <div className="text-sm">
+        {props.application.submitted_on !== null && (<div className="text-sm">
           Submitted on: {readableDate(props.application.submitted_on)}
-        </div>
+        </div>)}
         <div className="flex flex-row gap-2 text-sm">
           <span
             className={`text-xs p-1 rounded-md ${
@@ -107,10 +124,33 @@ const ApplicationCard = (props) => {
             }`}
             style={{ backgroundColor: "#eee" }}
           >
-            Payment:
-            {props?.application?.payment_status !== null
+            Payment: {props?.application?.payment_status !== null
               ? props?.application?.payment_status
               : "NA"}
+          </span>
+          <div className="w-[84px]">
+            <span
+              className={`text-xs py-1 px-2  rounded-md ${
+                props.application.round === 1
+                  ? "text-yellow-800"
+                  : "text-indigo-700"
+              }`}
+              style={{ backgroundColor: "#eee" }}
+            >
+              Round: <span> {props.application.round}</span>
+            </span> 
+          </div>
+        </div>
+        <div>
+          <span
+              className={`text-xs py-1 px-2 rounded-md  ${
+                props.application.round === 1
+                  ? "text-yellow-800"
+                  : "text-indigo-700"
+              }`}
+              style={{ backgroundColor: "#eee" }}
+            >
+            Course Applied: {props?.application?.institute?.course_applied ? props?.application?.institute?.course_applied : props?.application?.institutes?.course_applied }
           </span>
         </div>
       </div>
@@ -127,7 +167,8 @@ const ApplicationCard = (props) => {
           text="Pay"
           onClick={handlePayment}
           otherProps={{
-            disabled: props?.application?.payment_status !== "Pending",
+           // disabled: props?.application?.payment_status !== "Pending",
+            hidden: props?.application?.payment_status !== "Pending",
           }}
         ></Button>
       </div>

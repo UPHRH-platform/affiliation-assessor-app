@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate} from "react-router-dom";
 import "./App.css";
 
 import APPLICANT_ROUTE_MAP from "./routes/ApplicantRoute";
@@ -52,10 +52,22 @@ function App() {
 
   useEffect(() => {
     getPermissionForToken();
+   // console.log("REACT_APP_WEB_PORTAL_USER_SERVICE_URL-->", process.env.REACT_APP_WEB_PORTAL_USER_SERVICE_URL )
+    setInterval(() => {
+      console.log("checking conn",navigator.onLine)
+      if(!navigator.onLine){
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: "You seem to be offline. Please check your internet connection.",
+          toastType: "error",
+        }));
+      }
+    }, 5000);
   }, []);
 
   useEffect(() => {
-    if (toast) {
+    if (toast?.toastOpen) {
       setTimeout(() => {
         setToast({
           toastOpen: false,
@@ -75,6 +87,7 @@ function App() {
 
       <BrowserRouter>
         <Routes>
+        {<Route path="/" element={<Navigate to="/auth/login" />} />}
           <Route path={APPLICANT_ROUTE_MAP.auth} element={<Authenticate />}>
             <Route
               path={APPLICANT_ROUTE_MAP.loginModule.login}
@@ -101,7 +114,8 @@ function App() {
               }
             ></Route>
             <Route
-              path={APPLICANT_ROUTE_MAP.dashboardModule.all_applications}
+              path={`${APPLICANT_ROUTE_MAP.dashboardModule.all_applications}/:round?/:courseType?`}
+             
               element={
                 <PrivateRoute>
                   <AllApplications />
@@ -109,7 +123,7 @@ function App() {
               }
             ></Route>
             <Route
-              path={`${APPLICANT_ROUTE_MAP.dashboardModule.createForm}/:formName/:formId?/:applicantStatus?`}
+              path={`${APPLICANT_ROUTE_MAP.dashboardModule.createForm}/:formName/:formId?/:applicantStatus?/:paymentStage?`}
               element={
                 <PrivateRoute>
                   <CreateForm />

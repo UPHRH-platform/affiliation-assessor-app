@@ -9,6 +9,7 @@ import {
   ManageUsersFilters,
   OnGroundInspectionFilters,
   ScheduleManagementFilters,
+  DashboardFilters
 } from "./Filters";
 import { searchUsers } from "../../api";
 
@@ -144,7 +145,7 @@ const GlobalFilter = ({
               //On-Ground Inspection Analysis
               case ADMIN_ROUTE_MAP.adminModule.onGroundInspection.home:
                 return (
-                  <OnGroundInspectionFilters
+                  <DesktopAnalysisFilters
                     filterApiCall={filterApiCall}
                     paginationInfo={paginationInfo}
                     setIsFilterOpen={setIsFilterOpen}
@@ -158,6 +159,17 @@ const GlobalFilter = ({
                   <ScheduleManagementFilters
                     filterApiCall={filterApiCall}
                     paginationInfo={paginationInfo}
+                    setIsFilterOpen={setIsFilterOpen}
+                    setPaginationInfo={setPaginationInfo}
+                  />
+                );
+                // Dashboard
+              case ADMIN_ROUTE_MAP.adminModule.dashboard.home:
+                return (
+                  <DashboardFilters
+                    filterApiCall={filterApiCall}
+                    paginationInfo={paginationInfo}
+                    selectedRound={selectedRound}
                     setIsFilterOpen={setIsFilterOpen}
                     setPaginationInfo={setPaginationInfo}
                   />

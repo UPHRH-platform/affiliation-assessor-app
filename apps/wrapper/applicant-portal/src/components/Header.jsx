@@ -11,6 +11,9 @@ import {
   MenuItem,
 } from "@material-tailwind/react";
 import Overlay from "../pages/notifications/Overlay";
+import {
+  removeAllFromLocalForage,
+} from "./../forms";
 
 const Header = () => {
   const [showButtons, setshowButtons] = useState(false);
@@ -23,6 +26,7 @@ const Header = () => {
     removeCookie("institutes");
     removeCookie("firebase_client_token")
     removeCookie("formId");
+    removeAllFromLocalForage();
     navigate(APPLICANT_ROUTE_MAP.loginModule.login);
   };
 
@@ -69,7 +73,7 @@ const Header = () => {
                 </div>
               )}
 
-              {userData?.userRepresentation && (
+              {userData && (
                 <div className="flex flex-row gap-8 items-center">
                   <Overlay className="text-3xl text-gray-500" />
                   <Menu placement="bottom-end">
@@ -80,7 +84,7 @@ const Header = () => {
                         aria-haspopup="true"
                       >
                         {getInitials(
-                          `${userData?.userRepresentation?.firstName?.trim()} ${userData?.userRepresentation?.lastName?.trim()}`
+                          `${userData?.firstName?.trim()} ${userData?.lastName?.trim()}`
                         )}
                       </button>
                     </MenuHandler>

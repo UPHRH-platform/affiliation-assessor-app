@@ -3,9 +3,15 @@ import { APIS } from "../constants";
 import { getCookie } from "../utils";
 
 const BASE_URL =
-  process.env.REACT_APP_WEB_PORTAL_USER_SERVICE_URL ||
-  "https://uphrh.in/api/api/v1/user/";
+  process.env.REACT_APP_WEB_PORTAL_USER_SERVICE_URL
 
+  console.log("BASE_URL---->",BASE_URL)
+  try {
+    console.log(BASE_URL)
+    console.log("BASE_URL---->",BASE_URL)
+  } catch (error) {
+    console.log(error)
+  }
 const TOKEN_BASE_URL =
   process.env.REACT_APP_TOKEN_URL || "https://odk.upsmfac.org/auth/";
 
@@ -122,9 +128,27 @@ const getAccessToken = (postData) => {
   return accessTokenAxiosService.post(APIS.ACCESS_TOKEN.TOKEN_URL, postData);
 };
 
+const isUserActive = (postData) => {
+  return keyCloakAxiosService.post(APIS.USER.CHECKVALID,
+     {
+      request:{
+        fieldName: "email",
+        fieldValue: postData.email
+      }
+  },
+     {
+    headers: {
+      "Content-Type": "application/json",
+      // "Authorization": getCookie("access_token")
+      Authorization: process.env.REACT_APP_AUTH_TOKEN,
+    },
+  });
+
+};
 export const userService = {
   generateOtp,
   login,
   signup,
   getAccessToken,
+  isUserActive
 };

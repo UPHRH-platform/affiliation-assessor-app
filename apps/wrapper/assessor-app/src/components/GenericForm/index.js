@@ -156,11 +156,11 @@ const GenericForm = (props) => {
         </p>
       )}
       <div className={styles.formContainer}>
-        <iframe
+        {encodedFormURI !== "" && (<iframe
           title="current-form"
           className={styles.odkForm}
           src={`${ENKETO_URL}/preview?formSpec=${encodedFormSpec}&xform=${encodedFormURI}`}
-        />
+        />)}
         <div className={styles.jsonResponse}>
           <div className={styles.toggleBtn}>
             <label className={styles.switch}>

@@ -59,17 +59,16 @@ export const makeDataForPrefill = (prev, xmlDoc, key, finalObj, formName) => {
   }
 };
 
-export const updateFormData = async (startingForm) => {
+export const updateFormData = async (startingForm, formData, fileURLs) => {
   try {
     let data = await getFromLocalForage(
       `${startingForm}_${new Date().toISOString().split("T")[0]}`
     );
-
     const GCP_form_url = `${GCP_URL}${startingForm}.xml`;
     let prefilledForm = await getSubmissionXML(
       GCP_form_url,
-      data.formData,
-      data.imageUrls
+      formData,
+      fileURLs
     );
     return prefilledForm;
   } catch (err) {}
@@ -99,7 +98,39 @@ export const logout = () => {
   window.location = "/web/login";
   removeCookie("userData");
   serviceWorkerRegistration.unregister();
+  let db;
+      const DBOpenRequest = window.indexedDB.open("enketo", 3);
+      DBOpenRequest.onsuccess = (event) => {
+        db = DBOpenRequest.result;
+      
+        // Clear all the data from the object store
+        clearData(db);
 };
+}
+
+const clearData = (db) => {
+  // open a read/write db transaction, ready for clearing the data
+  const transaction = db?.transaction(["records"], "readwrite");
+  const enketodata = db?.transaction(["data"], "readwrite");
+
+  // report on the success of the transaction completing, when everything is done
+  // create an object store on the transaction
+  const objectStore = transaction.objectStore("records");
+  const objectStore2 = enketodata.objectStore("data");
+
+  // Make a request to clear all the data out of the object store
+  const objectStoreRequest = objectStore.clear();
+  const objectStoreRequest2 = objectStore2.clear();
+
+  objectStoreRequest.onsuccess = (event) => {
+    // report the success of our request
+    console.log("cleared entry - store (records)");
+  };
+  objectStoreRequest2.onsuccess = (event) => {
+    // report the success of our request
+    console.log("cleared entry - store 2 (data)");
+  };
+}
 
 export const removeCookie = (cname) => {
   try {
@@ -165,16 +196,15 @@ export const removeItemFromLocalForage = (key) => {
 
 export const handleFormEvents = async (startingForm, afterFormSubmit, e) => {
   const user = getCookie("userData");
-
   if (
-    ((ENKETO_URL === `${e.origin}/enketo`) || (ENKETO_URL === `${e.origin}/enketo/`)) &&
+    ((ENKETO_URL === `${e?.origin}/enketo`) || (ENKETO_URL === `${e?.origin}/enketo/`)) &&
     // e.origin === ENKETO_URL &&
     typeof e?.data === "string" &&
     JSON.parse(e?.data)?.state !== "ON_FORM_SUCCESS_COMPLETED"
   ) {
-    var formData = new XMLParser().parseFromString(JSON.parse(e.data).formData);
+    var formData = new XMLParser().parseFromString(JSON.parse(e?.data)?.formData);
     if (formData) {
-      let images = JSON.parse(e.data).fileURLs;
+      let images = JSON.parse(e?.data)?.fileURLs;
       let prevData = await getFromLocalForage(
         `${startingForm}_${new Date().toISOString().split("T")[0]}`
       );
@@ -183,7 +213,7 @@ export const handleFormEvents = async (startingForm, afterFormSubmit, e) => {
           new Date().toISOString().split("T")[0]
         }`,
         {
-          formData: JSON.parse(e.data).formData,
+          formData: JSON.parse(e?.data)?.formData,
           imageUrls: { ...prevData?.imageUrls, ...images },
         }
       );
@@ -266,7 +296,9 @@ export const getFormData = async ({
 
     // let prefilledForm = await getPrefillXML(...prefillXMLArgs);
     // setEncodedFormURI(prefilledForm);
-  } else setData(null);
+  } else {
+    setData(null);
+  }
   loading.current = false;
 };
 

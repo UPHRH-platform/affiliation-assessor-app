@@ -1,12 +1,15 @@
 import React, { useContext, useEffect, useState } from "react";
-import { getStatus } from "../../api";
+import { getStatus,
+  exportToExcel } from "../../api";
 import { readableDate } from "../../utils/common";
 import { Button } from "../../components";
 import { ContextAPI } from "../../utils/ContextAPI";
+import { useParams} from "react-router-dom";
 
 function StatusLogModal({ closeStatusModal, formId }) {
   const [formStatus, setFormStatus] = useState([]);
   const { setSpinner } = useContext(ContextAPI);
+  let { formName } = useParams();
   useEffect(() => {
     async function fetchData() {
       const postData = { id: formId };
@@ -23,6 +26,32 @@ function StatusLogModal({ closeStatusModal, formId }) {
     }
     fetchData();
   }, []);
+
+  const downloadStatus = () => {
+    const ENKETO_URL = formName;
+    const statusLogs = {
+      sheetName: 'Status logs',
+      downloadObject: [],
+      headers: ['Event Name', 'Created Date', 'Remarks'],
+    }
+
+    if(formStatus.length > 0) {
+      formStatus.forEach((element) => {
+        const status = {
+          event_name: element.event_name,
+          created_date: readableDate(element.created_date),
+          remarks: element.remarks,
+        }
+        statusLogs.downloadObject.push(status)
+      })
+    }
+
+    const downloadObjects = {
+      fileName: `status_log_${ENKETO_URL}.xlsx`,
+      objectsList: [statusLogs]
+    }
+    exportToExcel(downloadObjects);
+  }
 
   return (
     <>
@@ -52,6 +81,13 @@ function StatusLogModal({ closeStatusModal, formId }) {
               )}
             </div>
             <div className="footer flex flex-row justify-end">
+              <Button
+                onClick={() => {
+                  downloadStatus();
+                }}
+                moreClass="border mr-2 boevent_namerder-blue-500 bg-white text-blue-500 w-[140px]"
+                text="Download"
+              ></Button>
               <Button
                 onClick={() => {
                   closeStatusModal(false);

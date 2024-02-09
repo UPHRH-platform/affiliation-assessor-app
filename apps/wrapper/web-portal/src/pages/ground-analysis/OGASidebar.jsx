@@ -3,6 +3,7 @@ import {
   AiFillCheckCircle,
   AiFillCloseCircle,
   AiOutlineCheck,
+  AiOutlineRollback
 } from "react-icons/ai";
 
 export default function OGASidebar(props) {
@@ -46,7 +47,13 @@ export default function OGASidebar(props) {
                 {forms?.course?.course_name || "NA"}
               </div>
               <div className="flex items-center">
-                {forms?.noc_recommendation === null && <AiOutlineCheck />}
+              {forms?.noc_recommendation === null &&
+                forms?.form_status?.toLowerCase() === "returned" && (
+                  <AiOutlineRollback className="text-[20px] text-orange-500" />
+                )}
+                {forms?.noc_recommendation === null &&
+                forms?.form_status?.toLowerCase() != "returned" && (
+                 <AiOutlineCheck />)}
                 {forms?.noc_recommendation?.toLowerCase() === "recommended" && (
                   <AiFillCheckCircle className="text-[20px] text-green-500" />
                 )}

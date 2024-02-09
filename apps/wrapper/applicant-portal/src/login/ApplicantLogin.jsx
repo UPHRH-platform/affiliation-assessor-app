@@ -22,6 +22,7 @@ const ApplicantLogin = () => {
   const {
     register,
     handleSubmit,
+    resetField,
     formState: { errors },
   } = useForm();
   useEffect(() => {
@@ -38,6 +39,44 @@ const ApplicantLogin = () => {
     checkLoggedInStatus();
   }, [navigate]);
 
+  const handleBackClick = () => {
+    setEnableOtp(false);
+    resetField("otp");
+  }
+
+  const isUserActive = async (data) => {
+    //setSpinner(true);
+    console.log("REACT_APP_WEB_PORTAL_USER_SERVICE_URL-->", process.env.REACT_APP_WEB_PORTAL_USER_SERVICE_URL )
+
+    try {
+      const res = await userService.isUserActive(data);
+      console.log(res)
+      if (res?.data[0]?.enabled && res?.data[0]?.attributes.Role[0] === "Institute") {
+        login(data);
+        //setSpinner(false);
+      } else {
+        //setSpinner(false);
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: "User not found. Please contact system admin.",
+          toastType: "error",
+        }));
+        return
+      }
+      
+    } catch (error) {
+     // setSpinner(false);
+      setToast((prevState) => ({
+        ...prevState,
+        toastOpen: true,
+        toastMsg: "Something went wrong. Please try again later. ",
+        toastType: "error",
+      }));
+    }
+   
+  }
+
   const login = async (data) => {
     try {
       const otpRes = await userService.generateOtp({
@@ -48,14 +87,21 @@ const ApplicantLogin = () => {
         setEnableOtp(true);
         setEmailId(data.email);
       } else {
-        console.log("Something went wrong", otpRes);
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: otpRes?.data?.error ? otpRes?.data?.error : "Something went wrong.Please try again later",
+          toastType: "error",
+        }));
+     //   console.log("Something went wrong", otpRes);
+    
       }
     } catch (error) {
       console.log("Otp not sent due to some error", error);
       setToast((prevState) => ({
         ...prevState,
         toastOpen: true,
-        toastMsg: "User not registered.",
+        toastMsg: "Something went wrong.Please try again later",
         toastType: "error",
       }));
     }
@@ -67,7 +113,6 @@ const ApplicantLogin = () => {
         email: data.email,
         otp: Number(data.otp),
       };
-
       const loginRes = await userService.login(loginDetails);
 
       const applicantDetailsRes = await applicantService.getApplicantDetails({
@@ -84,8 +129,10 @@ const ApplicantLogin = () => {
 
       const role = loginRes?.data?.userRepresentation?.attributes?.Role?.[0];
 
+      console.log(loginRes?.data)
+
       if (role === "Institute") {
-        setCookie("userData", loginRes.data);
+        setCookie("userData", loginRes?.data?.userRepresentation);
         setCookie("institutes", applicantDetailsRes.data.institutes);
         navigate(APPLICANT_ROUTE_MAP.dashboardModule.my_applications);
       } else {
@@ -123,7 +170,8 @@ const ApplicantLogin = () => {
               <>
                 <form
                   onSubmit={handleSubmit((data) => {
-                    login(data);
+                    //login(data);
+                    isUserActive(data)
                   })}
                   noValidate
                 >
@@ -159,13 +207,13 @@ const ApplicantLogin = () => {
                     type="submit"
                   ></Button>
                   <p className="flex justify-center my-6">
-                    <span className="text-gray-400">Create an account, </span>
+                    <span className="text-gray-400">Not registered yet?, </span>
                     &nbsp;
                     <Link
                       to={APPLICANT_ROUTE_MAP.dashboardModule.register}
                       className="text-primary-700"
                     >
-                      Sign up
+                      Register here
                     </Link>
                   </p>
                 </form>
@@ -186,9 +234,10 @@ const ApplicantLogin = () => {
                       name="otp"
                       id="otp"
                       placeholder="0-0-0-0-0-0"
+
                       {...register("otp", {
                         required: true,
-                        pattern: /^\d{1,6}$/i,
+                        pattern:/^\d{1,6}$/i
                       })}
                       className="block w-full rounded-md border-0 p-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                       noValidate
@@ -208,11 +257,11 @@ const ApplicantLogin = () => {
                         Please enter the correct OTP
                       </p>
                     )}
-                    {toast.toastOpen && (
+                  {/*   {toast.toastOpen && (
                       <p className="text-red-500 mt-2 text-sm">
                         You are not a registered institute.
                       </p>
-                    )}
+                    )} */}
                   </div>
                   <Button
                     moreClass="uppercase text-white w-full mt-7"
@@ -222,9 +271,7 @@ const ApplicantLogin = () => {
                   <p className="flex justify-center my-6">
                     <span
                       className="text-primary-700 cursor-pointer"
-                      onClick={() => {
-                        setEnableOtp(false);
-                      }}
+                      onClick={handleBackClick}
                     >
                       Go back, re-enter the email id
                     </span>

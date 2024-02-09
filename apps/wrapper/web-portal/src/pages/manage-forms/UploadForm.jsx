@@ -32,7 +32,7 @@ const UploadForm = ({
     console.log("e.target.files",e.target.files[0])
     const fileUploaded = e?.target?.files[0];    
       setFileName(
-      fileUploaded.name.substring(0, fileUploaded.name.lastIndexOf("."))
+      fileUploaded?.name?.substring(0, fileUploaded.name.lastIndexOf("."))
     );
     handleFile(fileUploaded);
   };
@@ -57,7 +57,7 @@ const UploadForm = ({
   };
 
   const user_details = getCookie("userData");
-  const userId = user_details?.userRepresentation?.id;
+  const userId = user_details?.id;
   const formSpec = {
     skipOnSuccessMessage: true,
     prefill: {},

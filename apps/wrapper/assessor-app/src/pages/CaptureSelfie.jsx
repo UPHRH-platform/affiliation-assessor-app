@@ -79,17 +79,17 @@ const CaptureSelfie = () => {
 
   return (
     <CommonLayout
-      back={
-        role == "Medical"
-          ? ROUTE_MAP.assessment_type
-          : ROUTE_MAP.medical_assessments
-      }
+    back={
+      role == "Medical"
+        ? ROUTE_MAP.medical_assessments
+        : ROUTE_MAP.assessment_type
+    }
       logoutDisabled
-      iconType="close"
+      // iconType="close"
       pageTitle="2. Capture Selfie"
       pageDesc="Please ensure that all the assessors are getting captured in the selfie."
     >
-      <div className="flex flex-col px-6 gap-5 pb-5 overflow-y-auto">
+      <div className="flex flex-col px-6 h-3/4 gap-5 pb-5 overflow-y-auto">
         {img === null && (
           <div className="flex flex-col w-full gap-5">
             <Webcam

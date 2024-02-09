@@ -7,6 +7,9 @@ import FilteringTable from "../../components/table/FilteringTable";
 import { Button } from "../../components";
 import Nav from "../../components/Nav";
 import { ContextAPI } from "../../utils/ContextAPI";
+import * as XLSX from "xlsx";
+import { getCookie } from  "../../utils/common";
+
 
 import {
   filterAssessments,
@@ -16,13 +19,13 @@ import {
   deleteSchedule,
   getScheduledList,
   sendEmailNotification,
+  uploadAssessmentSchedule
+
 } from "../../api";
 import {
   setToLocalForage,
-  removeItemFromLocalForage,
   getFromLocalForage,
 } from "../../forms";
-import ADMIN_ROUTE_MAP from "../../routes/adminRouteMap";
 import BulkUploadScheduleModal from "./BulkUploadScheduleModal";
 import AlertModal from "../../components/AlertModal";
 
@@ -35,9 +38,8 @@ import {
 import { formatDate, readableDate } from "../../utils";
 
 const ScheduleManagementList = () => {
-  let today = `${new Date().getFullYear()}-${
-    new Date().getMonth() + 1
-  }-${new Date().getDate()}`;
+  let today = `${new Date().getFullYear()}-${new Date().getMonth() + 1
+    }-${new Date().getDate()}`;
   const navigation = useNavigate();
   const { setSpinner, setToast, toast } = useContext(ContextAPI);
   var resUserData = [];
@@ -63,6 +65,13 @@ const ScheduleManagementList = () => {
       actionButtonLabel: "",
     },
   });
+
+  const hiddenFileInput = React.useRef(null);
+
+  const [fileTypeError, setFileTypeError] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState({});
+  const [jsonData, setJsonData] = useState("");
 
   const COLUMNS = [
     {
@@ -204,17 +213,15 @@ const ScheduleManagementList = () => {
         const emailData = {
           recipientEmail: [`${assessment[0]?.assessor?.email}`],
           emailSubject: `Inspection Scheduled for ${assessment[0]?.institute?.name} Cancelled!`,
-          emailBody: `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Your Email Title</title><link href='https://fonts.googleapis.com/css2?family=Mulish:wght@400;600&display=swap' rel='stylesheet'></head><body style='font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;'><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 20px; text-align: center; background-color: #F5F5F5;'><img src='https://regulator.upsmfac.org/images/upsmf.png' alt='Logo' style='max-width: 360px;'></td></tr></table><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 36px;'><p style='color: #555555; font-size: 18px; font-family: 'Mulish', Arial, sans-serif;'>Dear ${
-            assessment[0]?.assessor?.name
-          },</p><p style='color: #555555; font-size: 18px; line-height: 1.6; font-family: 'Mulish', Arial, sans-serif;'>
-          This is to inform you that the inspection scheduled for ${
-            assessment[0]?.institute?.name
-          } on ${readableDate(
-            assessment[0]?.date
-          )} is cancelled. We will keep you posted for the upcoming inspections.
+          emailBody: `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Your Email Title</title><link href='https://fonts.googleapis.com/css2?family=Mulish:wght@400;600&display=swap' rel='stylesheet'></head><body style='font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;'><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 20px; text-align: center; background-color: #F5F5F5;'><img src='https://regulator.upsmfac.org/images/upsmf.png' alt='Logo' style='max-width: 360px;'></td></tr></table><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 36px;'><p style='color: #555555; font-size: 18px; font-family: 'Mulish', Arial, sans-serif;'>Dear ${assessment[0]?.assessor?.name
+            },</p><p style='color: #555555; font-size: 18px; line-height: 1.6; font-family: 'Mulish', Arial, sans-serif;'>
+          This is to inform you that the inspection scheduled for ${assessment[0]?.institute?.name
+            } on ${readableDate(
+              assessment[0]?.date
+            )} is cancelled. We will keep you posted for the upcoming inspections.
           </p></td></tr></table></body></html>`,
         };
-        sendEmailNotification(emailData);
+        // sendEmailNotification(emailData);
 
         fetchAllAssessmentSchedule();
       }
@@ -315,6 +322,83 @@ const ScheduleManagementList = () => {
     }
   };
 
+
+  const handleFileInputChange = (e) => {
+    const fileUploaded = e.target.files[0];
+    console.log(fileUploaded)
+    if (!fileUploaded?.name?.includes(".xls") || fileUploaded?.size > 2000000) {
+      setFileTypeError(true);
+    } else {
+      setFileName(
+        fileUploaded.name.substring(0, fileUploaded.name.lastIndexOf("."))
+      );
+      setFileTypeError(false);
+      setFile(fileUploaded);
+     // showFileDataInTable(fileUploaded)
+    // handleFileUploadSubmit();
+    }
+  };
+
+  
+
+  const showFileDataInTable = (file) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet);
+        setJsonData(JSON.stringify(json, null, 2));
+      };
+      reader.readAsBinaryString(file);
+      console.log(jsonData)
+    }
+  
+  };
+
+  const handleFileInputClick = (e) => {
+    hiddenFileInput.current.click();
+  };
+
+  const handleFileUploadSubmit = () => {
+    if(file){
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("userId", getCookie("userData")?.id);
+     console.log(formData)
+      submitAssessmentSchedule(formData);
+    }
+  };
+
+  const submitAssessmentSchedule = async (postData) => {
+    let res = {};
+    try {
+      setSpinner(true);
+      res = await uploadAssessmentSchedule(postData);
+   
+    } catch (error) {
+      console.log("error - ", error);
+    } finally {
+      setSpinner(false);
+      //setFile({});
+      setFileName("");
+     
+      setToast((prevState) => ({
+        ...prevState,
+        toastOpen: true,
+        toastMsg: res.status === 200 ? "Schedule uploaded successfully! Please check your email after some time." : "Failed to upload schedule !!",
+        toastType: res.status === 200 ? "success" : "error"
+      }));
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    
+    }
+  };
+
   useEffect(() => {
     if (!isSearchOpen && !isFilterOpen) {
       fetchAllAssessmentSchedule();
@@ -325,18 +409,78 @@ const ScheduleManagementList = () => {
     fetchAllScheduledList();
   }, []);
 
+  useEffect(() => {
+    //console.log(jsonData)
+  }, [jsonData]);
+
+  useEffect(() => {
+    //console.log(jsonData)
+    if(fileName === ""){
+      setFile()
+    }
+  }, [fileName]);
+  
+
   return (
     <>
       {showAlert && (
         <AlertModal showAlert={setShowAlert} {...state.alertContent} />
       )}
       <Nav />
+
       <div className={`container m-auto min-h-[calc(100vh-148px)] px-3 py-12`}>
+
+        <hr />
+        <div className=" sm:col-span-3 flex justify-end">
+          <input
+            type="file"
+            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ref={hiddenFileInput}
+            onChange={handleFileInputChange}
+            style={{ display: "none" }}
+          />
+
+          <Button
+            moreClass="m-4 text-white flex justify-center h-fit w-[300px] px-6"
+            text="Upload schedule ( xls files < 2MB ) "
+            onClick={handleFileInputClick}
+          />{" "}
+          {fileTypeError && (
+            <div className="text-red-500">
+              {"Only xls files accepted!(max size 2MB)"}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end ml-4">{fileName}</div>
+
+        <div className="footer flex flex-row justify-end ">
+          <button
+               onClick={() => {
+                setFileName("");    window.location.reload();
+              }} 
+            className="border border-blue-900 bg-white text-blue-900 w-[140px] h-[40px] font-medium rounded-[4px] m-3"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleFileUploadSubmit()}
+            disabled={fileName && !fileTypeError ? false : true}
+            // className="border border-blue-900 text-white bg-blue-900 w-[140px] h-[40px] font-medium rounded-[4px]"
+            className={`${fileName && !fileTypeError
+                ? "border border-blue-900 text-white bg-blue-900 w-[140px] h-[40px] m-3 font-medium rounded-[4px]"
+                : "cursor-not-allowed border border-gray-500 bg-white text-gray-500 px-8 h-[44px] m-3"
+              }`}
+          >
+            Submit
+          </button>
+        </div>
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">
             <div className="flex flex-row">
               <div className="flex flex-grow items-center">
                 {/* <div className="text-xl font-semibold">Schedule Management</div> */}
+
               </div>
               <div className="flex flex-grow justify-end">
                 {/* <span className="flex gap-4">
@@ -368,9 +512,9 @@ const ScheduleManagementList = () => {
             <FilteringTable
               dataList={scheduleTableList}
               columns={COLUMNS}
-              navigateFunc={() => {}}
+              navigateFunc={() => { }}
               filterApiCall={filterApiCall}
-              onRowSelect={() => {}}
+              onRowSelect={() => { }}
               pagination={true}
               showFilter={true}
               showSearch={true}

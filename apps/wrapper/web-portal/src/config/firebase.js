@@ -30,7 +30,7 @@ export const getPermissionForToken = () => {
   window.Notification.requestPermission();
   const permission = window.Notification.permission;
   if (permission === "granted") {
-    console.log("Notification User Permission Granted.");
+    console.log(" User Permission Granted for Notifications.");
     return getToken(messaging, { vapidKey: `${VAPID_KEY}` })
       .then((currentToken) => {
         if (currentToken) {
@@ -38,7 +38,7 @@ export const getPermissionForToken = () => {
           setCookie("firebase_client_token", currentToken);
           if (getCookie("userData") !== undefined) {
             updateRegulatorDeviceId({
-              user_id: getCookie("userData")?.userRepresentation?.id,
+              user_id: getCookie("userData")?.id,
               device_id: JSON.stringify([getCookie("firebase_client_token")]),
             });
           }
@@ -55,6 +55,6 @@ export const getPermissionForToken = () => {
   } else if (permission === "default") {
     window.Notification.requestPermission();
   } else {
-    console.log("User Permission Denied.");
+    console.log("User Permission Denied for notifications.");
   }
 };

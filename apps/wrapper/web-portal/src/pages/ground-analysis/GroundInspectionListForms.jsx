@@ -13,6 +13,7 @@ import {
   getOnGroundAssessorData,
   markReviewStatus,
   searchOGA,
+  getOGAFormsCount
 } from "../../api";
 import ADMIN_ROUTE_MAP from "../../routes/adminRouteMap";
 import { ContextAPI } from "../../utils/ContextAPI";
@@ -36,10 +37,19 @@ export default function OnGroundInspectionAnalysis() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { setSpinner } = useContext(ContextAPI);
 
+  const [ogaFormsCompletedCount, setOgaFormsCompletedCount] = useState(0);
+  const [ogaFormsApprovedCount, setOgaFormsApprovedCount] = useState(0);
+  const [ogaFormsRejectedCount, setOgaFormsRejectedCount] = useState(0);
+  const [ogaFormsReturnedCount, setOgaFormsReturnedCount] = useState(0);
+
   const COLUMN_OGA_COMPLETED = [
     {
       Header: "Form name",
       accessor: "display_form_name",
+    },
+    {
+      Header: "Course name",
+      accessor: "course_name",
     },
     {
       Header: "Institute",
@@ -72,6 +82,10 @@ export default function OnGroundInspectionAnalysis() {
       accessor: "display_form_name",
     },
     {
+      Header: "Course name",
+      accessor: "course_name",
+    },
+    {
       Header: "Institute",
       accessor: "applicant",
     },
@@ -102,6 +116,10 @@ export default function OnGroundInspectionAnalysis() {
       accessor: "display_form_name",
     },
     {
+      Header: "Course name",
+      accessor: "course_name",
+    },
+    {
       Header: "Institute",
       accessor: "applicant",
     },
@@ -119,6 +137,40 @@ export default function OnGroundInspectionAnalysis() {
     },
     {
       Header: "Rejected on",
+      accessor: "reviewed_on",
+    },
+    {
+      Header: "Status",
+      accessor: "status",
+    },
+  ];
+  const COLUMN_RETURNED = [
+    {
+      Header: "Form name",
+      accessor: "display_form_name",
+    },
+    {
+      Header: "Course name",
+      accessor: "course_name",
+    },
+    {
+      Header: "Institute",
+      accessor: "applicant",
+    },
+    {
+      Header: "Application type",
+      accessor: "application_type",
+    },
+    {
+      Header: "Course type",
+      accessor: "course_type",
+    },
+    {
+      Header: "Assessor",
+      accessor: "assessor",
+    },
+    {
+      Header: "Returned on",
       accessor: "reviewed_on",
     },
     {
@@ -181,6 +233,13 @@ export default function OnGroundInspectionAnalysis() {
   };
 
   useEffect(() => {
+      fetchOGAFormsCount("OGA Completed");
+      fetchOGAFormsCount("Approved");
+      fetchOGAFormsCount("Rejected");
+      fetchOGAFormsCount("Returned");
+  }, [round]);
+
+  useEffect(() => {
     if (!isSearchOpen && !isFilterOpen) {
       fetchOnGroundAssessorData();
     }
@@ -191,7 +250,56 @@ export default function OnGroundInspectionAnalysis() {
     round,
   ]);
 
-  const fetchOnGroundAssessorData = async () => {
+
+  const fetchOGAFormsCount = async (formStatus) => {
+    const postData = {
+      formStatus: formStatus,
+      round: round
+    };
+    try {
+      setSpinner(true);
+      const res = await getOGAFormsCount(postData);
+      switch (formStatus) {
+        case "OGA Completed":
+          res?.data?.form_submissions_aggregate.aggregate.totalCount < 10
+          ? setOgaFormsCompletedCount('0'+res?.data?.form_submissions_aggregate.aggregate.totalCount)
+          :  setOgaFormsCompletedCount(res?.data?.form_submissions_aggregate.aggregate.totalCount)
+          
+          break;
+
+        case "Approved":
+          res?.data?.form_submissions_aggregate.aggregate.totalCount < 10
+         ? setOgaFormsApprovedCount('0'+res?.data?.form_submissions_aggregate.aggregate.totalCount)
+         :  setOgaFormsApprovedCount(res?.data?.form_submissions_aggregate.aggregate.totalCount)
+         
+          break;
+
+        case "Rejected":
+          res?.data?.form_submissions_aggregate.aggregate.totalCount < 10
+          ? setOgaFormsRejectedCount('0'+res?.data?.form_submissions_aggregate.aggregate.totalCount)
+          :  setOgaFormsRejectedCount(res?.data?.form_submissions_aggregate.aggregate.totalCount)
+          
+          break;
+          case "Returned":
+            res?.data?.form_submissions_aggregate.aggregate.totalCount < 10
+            ? setOgaFormsReturnedCount('0'+res?.data?.form_submissions_aggregate.aggregate.totalCount)
+            :  setOgaFormsReturnedCount(res?.data?.form_submissions_aggregate.aggregate.totalCount)
+               
+          break;
+
+        default:
+          break;
+      }
+   
+    } catch (error) {
+      console.log("error - ", error);
+    } finally {
+      setSpinner(false);
+    }
+  };
+
+  const fetchOnGroundAssessorData
+   = async () => {
     const postData = {
       offsetNo: paginationInfo.offsetNo,
       limit: paginationInfo.limit,
@@ -205,6 +313,7 @@ export default function OnGroundInspectionAnalysis() {
         ...prevState,
         totalCount: res?.data?.form_submissions_aggregate.aggregate.totalCount,
       }));
+      console.log(res?.data?.form_submissions_aggregate.aggregate.totalCount)
       setFormsList(res?.data?.form_submissions);
     } catch (error) {
       console.log("error - ", error);
@@ -274,7 +383,8 @@ export default function OnGroundInspectionAnalysis() {
 
   formsList?.forEach((e) => {
     var formsData = {
-      display_form_name: e?.course?.course_name,
+      display_form_name:  e?.form_name,
+      course_name: e?.course?.course_name,
       applicant:
         e?.institute?.name?.charAt(0).toUpperCase() +
         e?.institute?.name?.substring(1).toLowerCase() +
@@ -381,6 +491,7 @@ export default function OnGroundInspectionAnalysis() {
                 className="gap-3"
                 onClick={() => handleSelectMenu("OGA Completed")}
               >
+                <span>
                 <a
                   href="#"
                   className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
@@ -390,8 +501,11 @@ export default function OnGroundInspectionAnalysis() {
                   }`}
                   aria-current="page"
                 >
-                  OGA Completed
+                  OGA Completed      <span class="counter count-indicator-completed">  {ogaFormsCompletedCount}</span>
                 </a>
+               
+                </span>
+               
               </li>
               <li
                 className="gap-3"
@@ -406,7 +520,7 @@ export default function OnGroundInspectionAnalysis() {
                   }`}
                   aria-current="page"
                 >
-                  Approved
+                  Approved   <span class="counter count-indicator-approved">{ogaFormsApprovedCount}</span>
                 </a>
               </li>
               <li
@@ -421,7 +535,24 @@ export default function OnGroundInspectionAnalysis() {
                       : ""
                   }`}
                 >
-                  Rejected
+                  Rejected  <span class="counter count-indicator-rejected">{ogaFormsRejectedCount}</span>
+               
+                </a>
+              </li>
+              <li
+                className="gap-3"
+                onClick={() => handleSelectMenu("Returned")}
+              >
+                <a
+                  href="#"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
+                    state.menu_selected === "Returned"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : ""
+                  }`}
+                >
+                  Returned  <span class="counter count-indicator-returned">{ogaFormsReturnedCount}</span>
+               
                 </a>
               </li>
             </ul>
@@ -479,6 +610,28 @@ export default function OnGroundInspectionAnalysis() {
                   )}
                   navigateFunc={navigateToView}
                   columns={COLUMN_REJECTED}
+                  pagination={true}
+                  onRowSelect={() => {}}
+                  filterApiCall={filterApiCall}
+                  showFilter={true}
+                  showSearch={true}
+                  paginationInfo={paginationInfo}
+                  setPaginationInfo={setPaginationInfo}
+                  searchApiCall={searchApiCall}
+                  setIsSearchOpen={setIsSearchOpen}
+                  setIsFilterOpen={setIsFilterOpen}
+                  selectedRound={round}
+                />
+              </div>
+            )}
+             {state.menu_selected === "Returned" && (
+              <div className="flex flex-col gap-4">
+                <FilteringTable
+                  dataList={resData.filter(
+                    (item) => item.form_status === "Returned"
+                  )}
+                  navigateFunc={navigateToView}
+                  columns={COLUMN_RETURNED}
                   pagination={true}
                   onRowSelect={() => {}}
                   filterApiCall={filterApiCall}

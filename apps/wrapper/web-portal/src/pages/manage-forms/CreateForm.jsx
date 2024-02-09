@@ -1,16 +1,27 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState ,useRef} from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import Button from "../../components/Button";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
+import "./calendar.css";
 
 import { FaAngleRight } from "react-icons/fa";
 import UploadForm from "./UploadForm";
-import { convertODKtoXML, createForm, updateForms, viewForm } from "../../api";
+import {
+  convertODKtoXML,
+  createForm,
+  updateForms,
+  viewForm,
+  findFormsWithSameName,
+  getCoursesByTypeAndLevel,
+} from "../../api";
 import { Label } from "../../components";
 import ADMIN_ROUTE_MAP from "../../routes/adminRouteMap";
 import { ContextAPI } from "../../utils/ContextAPI";
 import { setCookie, getCookie, removeCookie } from "../../utils/common";
+import { formatDate, readableDate } from "../../utils/common";
 
 const CreateForm = () => {
   const [formStatus, setFormStatus] = useState("");
@@ -19,12 +30,30 @@ const CreateForm = () => {
   const [formStage, setFormStage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [xmlData, setXmlData] = useState(null);
+  const [courseMapping, setCourseMapping] = useState(null);
+  let requestData = { courseType: '', courseLevel: '' };
   const [formData, setFormData] = useState({
     title: "",
+    assignee :"",
+    course_type :"" ,
+    course_mapping :"",
+    labels :"",
+    course_level :"",
+    round_no:"",
+    application_type :"",
+    form_desc :"" ,
+    last_submission_date :""
   });
+  const [sameFileNameerror, setSameFileNameerror] = useState(false);
   const { setSpinner, setToast } = useContext(ContextAPI);
   let assigneePrefix = "";
   assigneePrefix = formData?.assignee;
+
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [buttonText, setButtonText] = useState("Last Date For Submission");
+  
+  const [lastDateToApply, setLastDateToApply] = useState(null);
+  const calendarRef = useRef(null);
 
   const handleChange = (e) => {
     setFormData((prevState) => ({
@@ -33,10 +62,121 @@ const CreateForm = () => {
     }));
   };
 
+
+  const handleCalendarOnChangeDate = (date) => {
+    setButtonText(formatDate(date));
+    setShowCalendar(false);
+    setLastDateToApply(date);
+    setFormData((prevState) => ({
+      ...prevState,
+      last_submission_date: formatDate(date),
+    }));
+  };
+
+  const handleCourseTypeChange = (e) => {
+    formData.course_mapping="";
+    setFormData((prevState) => ({
+      ...prevState,
+      [e.target.name]: e.target.value,
+    }));
+    requestData.courseType = e.target.value;
+    requestData.courseLevel = formData.course_level;
+    if ((requestData.courseType !== undefined && requestData.courseLevel !== undefined) && (requestData.courseLevel !== "" && requestData.courseType !== "")) {
+      getCourses(requestData);
+    }
+  }
+
+  const handleCourseLevelChange = (e) => {
+    formData.course_mapping="";
+    setFormData((prevState) => ({
+      ...prevState,
+      [e.target.name]: e.target.value,
+    }));
+    requestData.courseType = formData.course_type;
+    requestData.courseLevel = e.target.value;
+    if ((requestData.courseType !== undefined && requestData.courseLevel !== undefined) && (requestData.courseLevel !== "" && requestData.courseType !== "")) {
+      getCourses(requestData);
+    }
+  }
+
+  const getCourses = async (postData) => {
+    try {
+      const response = await getCoursesByTypeAndLevel(postData);
+      formData.course_mapping="";
+      if(response?.data){
+        setCourseMapping(response?.data?.course_mapping);
+      }
+     
+    } catch (error) {
+      console.log(error)
+    }
+   
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    setFormStage(2);
+    if(!formId){
+      findForms();
+    } else {
+      setFormStage(2);
+    //  isFieldsValid();
+    }
+   
   };
+
+  const isFieldsValid = () => {
+    //console.log("----------")
+    if (
+      formData.title ===  "" ||
+      formData.assignee === "" || 
+      formData.course_type ===  ""  || 
+      formData.course_mapping ===  ""  || 
+      formData.labels ===  ""  || 
+      formData.course_level ===  ""  || 
+      formData.round_no ===  "" || 
+      formData.application_type ===  ""  || 
+      formData.form_desc ===  "" || 
+      formData.last_submission_date ===  "" 
+    ) {
+      return true;
+    } else return false;
+  };
+
+  const findForms = async () => {
+    try {
+      setSpinner(true);
+      const reqBody = {
+        "param": {
+          "title": {
+            "_eq": formData.title.trim()
+          },
+          "assignee": {
+            "_eq": formData.assignee.toLowerCase().trim()
+          }
+        }
+      }
+      const res = await findFormsWithSameName(reqBody);
+      if (res.data.forms_aggregate.aggregate.totalCount != 0) {
+        setFormData((prevState) => ({
+          ...prevState,
+          title: ""
+        }));
+        setSameFileNameerror(true)
+      } else {
+        setSameFileNameerror(false)
+        setFormStage(2);
+      }
+    } catch (error) {
+      setToast((prevState) => ({
+        ...prevState,
+        toastOpen: true,
+        toastMsg: "Something went wrong. Please try again later",
+        toastType: "error",
+      }));
+    } finally {
+      setSpinner(false);
+    }
+  }
 
   const handleFile = (file) => {
     const formData = {
@@ -52,7 +192,7 @@ const CreateForm = () => {
     const user = getCookie("regulator");
     postData.append("user_id", user?.[0]?.user_id);
     postData.append("form_status", "Draft");
-
+   // postData.append("last_submission_date", formatDate(lastDateToApply));
     try {
       setSpinner(true);
       setLoading(true);
@@ -119,19 +259,28 @@ const CreateForm = () => {
       const response = await viewForm(formData);
       const formDetail = response.data.forms[0];
       setFormStatus(formDetail?.form_status);
-
-      setFormData({
-        application_type: formDetail?.application_type,
-        form_desc: formDetail.form_desc,
-        assignee: formDetail?.assignee,
-        course_type: formDetail?.course_type,
-        course_level: formDetail?.course_level,
-        labels: formDetail?.labels,
-        round_no: formDetail?.round,
-        title: formDetail?.title,
-        path: formDetail?.path,
-        file_name: formDetail?.file_name,
-      });
+      if (formDetail) {
+        const req = {
+          courseType: formDetail?.course_type,
+          courseLevel: formDetail?.course_level,
+        }
+        getCourses(req);
+        setFormData({
+          application_type: formDetail?.application_type,
+          form_desc: formDetail.form_desc,
+          assignee: formDetail?.assignee,
+          course_type: formDetail?.course_type,
+          course_level: formDetail?.course_level,
+          course_mapping: formDetail?.course_mapping,
+          labels: formDetail?.labels,
+          round_no: formDetail?.round,
+          title: formDetail?.title,
+          path: formDetail?.path,
+          file_name: formDetail?.file_name,
+          last_submission_date: formDetail?.last_submission_date
+        });
+        setLastDateToApply(new Date(formDetail?.last_submission_date))
+      }
     } catch (error) {
       console.log("error - ", error);
       setToast((prevState) => ({
@@ -144,6 +293,26 @@ const CreateForm = () => {
       setSpinner(false);
     }
   };
+
+  const handleOutsideDateClick = (e) => {
+    if (calendarRef.current && !calendarRef.current.contains(e.target)) {
+      setShowCalendar(false)
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleOutsideDateClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideDateClick);
+    };
+  });
+
+  useEffect(() => {
+   console.log(lastDateToApply)
+   lastDateToApply ?  setButtonText(formatDate(lastDateToApply))
+   : setButtonText("Last Date For Submission")
+  }, [lastDateToApply]);
+
 
   useEffect(() => {
     if (window.location.pathname.includes("view")) {
@@ -168,8 +337,7 @@ const CreateForm = () => {
             <Link to={ADMIN_ROUTE_MAP.adminModule.scheduleManagement.home}>
               <span className="text-gray-500">Create form</span>
             </Link>
-            {/* <FaAngleRight className="text-[16px]" />
-            <span className="text-gray-500 uppercase">User details</span> */}
+
           </div>
         </div>
       </div>
@@ -188,33 +356,34 @@ const CreateForm = () => {
                   }
                 />
                 <Button
-                  moreClass={`${
-                    Object.values(formData).length !== 10
+                  moreClass={`${Object.values(formData).length !== 12
                       ? "text-gray-500 bg-white border border-gray-300 cursor-not-allowed"
                       : "text-white border"
-                  } px-6`}
+                    } px-6`}
                   text="Update"
                   onClick={() => handleSaveUpdateDraft("update")}
                   otherProps={{
-                    disabled: Object.values(formData).length !== 10,
+                    disabled: Object.values(formData).length !== 12,
                     style: { display: formStatus !== "Draft" ? "none" : "" },
                   }}
                 />
+                  {console.log(formData)}
                 <Button
-                  moreClass={`${
-                    Object.values(formData).length !== 10
+                  moreClass={`${Object.values(formData).length !== 12
                       ? "text-gray-500 bg-white border border-gray-300 cursor-not-allowed"
                       : "text-white border"
-                  } px-6`}
+                    } px-6`}
                   text="Save as draft"
                   onClick={() => handleSaveUpdateDraft("save")}
+                
                   otherProps={{
-                    disabled: Object.values(formData).length !== 10,
+                    disabled: Object.values(formData).length !== 12,
+                    hidden: formStage <= 1,
                     style: {
                       display:
                         formStatus === "Published" ||
-                        formStatus === "Unpublished" ||
-                        formStatus === "Draft"
+                          formStatus === "Unpublished" ||
+                          formStatus === "Draft"
                           ? "none"
                           : "",
                     },
@@ -225,34 +394,32 @@ const CreateForm = () => {
 
             <div className="flex flex-row gap-4 justify-center">
               <div
-                className={`${
-                  formStage === 1
+                className={`${formStage === 1
                     ? "bg-black text-white"
                     : "bg-white text-black"
-                } py-3 px-10 rounded-[4px] text-[16px]`}
+                  } py-3 px-10 rounded-[4px] text-[16px]`}
               >
                 1. Add attributes
               </div>
               <div
-                className={`${
-                  formStage === 2
+                className={`${formStage === 2
                     ? "bg-black text-white"
                     : "bg-white text-black"
-                } py-3 px-10 rounded-[4px] text-[16px]`}
+                  } py-3 px-10 rounded-[4px] text-[16px]`}
               >
                 2. Upload ODK
               </div>
             </div>
 
             {formStage === 1 && (
-              <form onSubmit={handleSubmit}>
+              <form>
                 <div className="flex flex-col bg-white rounded-[4px] p-8 gap-8">
                   <div className="flex">
                     <h1 className="text-xl font-semibold">Add attributes</h1>
                   </div>
                   <div className="flex flex-grow">
                     <div className="grid grid-rows-3 grid-cols-6 gap-8">
-                      <div className="sm:col-span-3">
+                    <div className="sm:col-span-3">
                         <Label
                           required
                           text="Form title"
@@ -273,8 +440,41 @@ const CreateForm = () => {
                             }
                             className="block w-full rounded-md border-0 p-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                           />
+                          {sameFileNameerror && (
+                            <div className="text-red-500 mt-2 text-sm">
+                              ODK with this name already exists
+                            </div>
+                          )}
                         </div>
                       </div>
+                      <div 
+
+                      className="sm:col-span-3"   ref={calendarRef}>
+                        <Label
+                          required
+                          text="Last Date for Submission"
+                          htmlFor="last_date"
+                          moreClass="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400"
+                        />
+
+                            <button type="button"
+                              className="h-[45px] bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 px-8"
+                              onClick={() => setShowCalendar(true)}
+                              disabled={
+                                formStatus == "Published" ||
+                                formStatus == "Unpublished"
+                              }
+                            >
+                              {buttonText.includes("Last Date For Submission") ? buttonText : readableDate(buttonText)}
+                            </button>
+                            {showCalendar && (
+                              <Calendar minDate={new Date()}
+                               value={lastDateToApply} 
+                               onChange={handleCalendarOnChangeDate} />
+                            )}
+                          
+                      </div>
+                   
                       <div className="sm:col-span-6">
                         <Label
                           required
@@ -364,7 +564,7 @@ const CreateForm = () => {
                           value={formData.course_type}
                           name="course_type"
                           id="course_type"
-                          onChange={handleChange}
+                          onChange={handleCourseTypeChange}
                           disabled={
                             formStatus == "Published" ||
                             formStatus == "Unpublished"
@@ -389,7 +589,7 @@ const CreateForm = () => {
                           value={formData.course_level}
                           name="course_level"
                           id="course_level"
-                          onChange={handleChange}
+                          onChange={handleCourseLevelChange}
                           disabled={
                             formStatus == "Published" ||
                             formStatus == "Unpublished"
@@ -401,8 +601,36 @@ const CreateForm = () => {
                           <option value="Diploma">Diploma</option>
                         </select>
                       </div>
-
-                      <div className="sm:col-span-3 ">
+                      {courseMapping !== null && (
+                        <div className="sm:col-span-3">
+                          <Label
+                            required
+                            text="Course Name"
+                            htmlFor="course_mapping"
+                            moreClass="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400"
+                          />
+                          <select
+                            required
+                            value={formData.course_mapping}
+                            name="course_mapping"
+                            id="course_mapping"
+                            onChange={handleChange}
+                            disabled={
+                              formStatus == "Published" ||
+                              formStatus == "Unpublished"
+                            }
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                          >
+                            <option value="">Select Here</option>
+                            {courseMapping.map((obj, index) => (
+                              <>
+                                <option key={index} value={obj.course}>{obj.course}</option>
+                              </>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="sm:col-span-3">
                         <Label
                           required
                           text="Form labels"
@@ -463,20 +691,18 @@ const CreateForm = () => {
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <button
-                      className={`${
-                        Object.values(formData).length < 7
-                          ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                          : "px-6 text-white bg-primary-900 border"
-                      } border w-[140px] h-[40px] font-medium rounded-[4px] `}
-                      style={{ backgroundColor: "" }}
-                      type="submit"
-                      disabled={
-                        Object.values(formData).length < 8 ? true : false
-                      }
+                    <Button
+                       moreClass="border text-white w-[120px]"
+                       text="Next"
+                    /*   disabled={
+                        Object.values(formData).length < 10 ? true : false
+                      } */
+                      otherProps={{
+                        disabled : isFieldsValid(),
+                      }}
+                      onClick={handleSubmit}
                     >
-                      Next
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </form>

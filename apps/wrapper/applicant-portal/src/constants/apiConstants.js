@@ -1,6 +1,8 @@
 export const APIS = {
   APPLICATIONS: {
     STATUS_LIST: "/rest/getApplicationStatus",
+    OTHER_VALID_FORMS:"/rest/applicantApplicationStatus",
+    DRAFTED_APPLICATIONS: "/rest/getAllInstituteDrafts"
   },
   COMMON: {
     REGISTER_EVENT: `/rest/addEvents`,
@@ -9,14 +11,23 @@ export const APIS = {
   FORMS: {
     LIST: "/rest/getAllCourses",
     VIEW_FORM: `/rest/getFormData`,
+    SAVE_DRAFT: "/rest/instituteFormsDrafts",
+    UPDATE_DRAFT: "/rest/updateInstituteFormDrafts",
+    DELETE_DRAFT: "/rest/deleteInstituteFormDraftsById",
+    UPDATE_FORM: "/rest/updateForm"
   },
   SIGNUP: {
     CREATE_USER: "create",
+    CHECK_IS_EMAIL_EXIST: `/rest/findUserByEmail`
   },
   EDITUSERS:{
     EDIT_USER: "update",
   },
 
+  USER:{
+    CHECKVALID: "emaildetails"
+  },
+  
   LOGIN: {
     GENERATE_OTP: "keycloak/otp",
     USERLOGIN: "keycloak/login",
@@ -38,7 +49,8 @@ export const APIS = {
   },
   FORM: {
     UPDATE_FORM: "/rest/updateFormSubmission",
-    UPDATE_CHILD_CODE: "/rest/updateChildCode"
+    UPDATE_CHILD_CODE: "/rest/updateChildCode",
+    SAVE_INITIAL_FORM_SUBMISSION: "/rest/saveInitialFormSubmissions"
   },
   SEARCH:{
     SEARCH_FORM: "/rest/searchCourses"
@@ -52,7 +64,12 @@ export const APIS = {
     readNotification: `notification/update`,
   },
   PAYMENT:{
+    GENERATE_LINK_V2: `payment/v2/generatelink`,
     GENERATE_LINK: `payment/generatelink`,
-    UPDATE_PAYMENT_STATUS: `rest/updatePaymentStatus`
-  }
+    UPDATE_PAYMENT_STATUS: `rest/updatePaymentStatus`,
+    UPDATE_INITIAL_PAYMENT_STATUS: `rest/updateTransactionStatusByRefNo`
+  },
+  viewStatus: {
+    getViewStatus: `rest/getEvents`,
+  },
 };

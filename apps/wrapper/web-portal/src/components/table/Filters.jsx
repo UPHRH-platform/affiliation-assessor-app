@@ -109,6 +109,7 @@ export const ManageFormsFilters = ({
     application_type: null,
     round: null,
     course_type: null,
+    course_level: null,
   });
   const handleChange = (name, value) => {
     setState((prevState) => ({
@@ -191,8 +192,8 @@ export const ManageFormsFilters = ({
           className="bg-gray-50"
         >
           {/* <Option value="">Course Type</Option> */}
-          <Option value="nursing">Nursing</Option>
-          <Option value="paramedical">Paramedical</Option>
+          <Option value="Nursing">Nursing</Option>
+          <Option value="Paramedical">Paramedical</Option>
         </Select>
       </div>
       <div>
@@ -238,7 +239,7 @@ export const DesktopAnalysisFilters = ({
       delete filters?.condition[name];
       return;
     }
-    if (name === "course_type" || name === "application_type") {
+    if (name === "course_type" || name === "application_type" || name === "course_level") {
       setFilters({
         condition: {
           ...filters.condition,
@@ -338,6 +339,20 @@ export const DesktopAnalysisFilters = ({
           {/* <Option value="">Course Name</Option> */}
           <Option value="Nursing">Nursing</Option>
           <Option value="Paramedical">Paramedical</Option>
+        </Select>
+      </div>
+      <div className="flex">
+        <Select
+          name="course_level"
+          id="course_level"
+          label="Course Level"
+          value={state.course_level}
+          onChange={(value) => handleChange("course_level", value)}
+          className="bg-gray-50"
+        >
+          {/* <Option value="">Course Name</Option> */}
+          <Option value="Degree">Degree</Option>
+          <Option value="Diploma">Diploma</Option>
         </Select>
       </div>
       <div className="flex">
@@ -634,9 +649,204 @@ export const ScheduleManagementFilters = ({
           className="bg-gray-50"
         >
           {/* <Option value="">--Select Status--</Option> */}
-          <Option value="Completed">Completed</Option>
+          <Option value="OGA Completed">Completed</Option>
           <Option value="Upcoming">Upcoming</Option>
-          <Option value="Closed">Closed</Option>
+          <Option value="Inspection Delayed">Delayed</Option>
+        </Select>
+      </div>
+      <div>
+        <button
+          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          onClick={handleClearFilter}
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+// Dashboard
+export const DashboardFilters = ({
+  selectedRound,
+  filterApiCall,
+  setIsFilterOpen,
+  paginationInfo,
+  setPaginationInfo,
+}) => {
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [buttonText, setButtonText] = useState("Date");
+  const [filters, setFilters] = useState(null);
+  const [state, setState] = useState({
+    selectedRound:0,
+    district: null,
+    startDate: null,
+    endDate:null,
+    status: null,
+  });
+  const [dateRange, setDateRange] = useState([new Date(), new Date()]);
+
+
+  const handleChange = (name, value) => {
+    console.log(name)
+
+    setState((prevState) => ({
+      ...prevState,
+      [name]: value,
+    }));
+
+    if (name === "district") {
+      setFilters((prevState) => ({
+        ...prevState,
+        "district": value
+      }));
+    } else{
+      setFilters((prevState) => ({
+        ...prevState,
+        "status": value
+      }));
+    }
+    console.log(filters)
+    setIsFilterOpen(value ? true : false);
+    setPaginationInfo((prevState) => ({
+      ...prevState,
+      offsetNo: 0,
+    }));
+  };
+
+  const handleClearFilter = () => {
+    setState({
+    district: null,
+    startDate: null,
+    endDate:null,
+    status: null
+    });
+    setButtonText("Date");
+    setDateRange([new Date(), new Date()])
+    setFilters('cleared');
+    setPaginationInfo((prevState) => ({
+      ...prevState,
+      offsetNo: 0,
+    }));
+  };
+
+  const handleDateChange = (date) => {
+    console.log(date)
+   // console.log(round)
+    setDateRange([date, date]);
+    setButtonText(readableDate(formatDate(date[0])) + " - " + readableDate(formatDate(date[1])));
+    setShowCalendar(false);
+    setState((prevState) => ({
+      ...prevState,
+      startDate:formatDate(date[0]),
+      endDate:formatDate(date[1])
+    }));
+   
+    setFilters((prevState) => ({
+      ...prevState,
+      "startDate":formatDate(date[0]),
+      "endDate":formatDate(date[1])
+    }));
+
+     setIsFilterOpen(date ? true : false);
+     setPaginationInfo((prevState) => ({
+       ...prevState,
+       offsetNo: 0,
+     })); 
+  };
+
+  const handleDateRangeSelect = (date) => {
+    console.log(date)
+   /*  console.log(formatDate(date))
+    setButtonText(formatDate(date)); */
+    setShowCalendar(false);
+  /*   setFilters({
+      condition: {
+        ...filters.condition,
+        date: {
+          _eq: formatDate(date),
+        },
+      },
+    });
+    setIsFilterOpen(date ? true : false); */
+    setPaginationInfo((prevState) => ({
+      ...prevState,
+      offsetNo: 0,
+    }));
+  };
+
+  useEffect(() => {
+    filterApiCall(filters);
+  }, [filters, paginationInfo.offsetNo, paginationInfo.limit]);
+
+  return (
+    <div className="flex flex-grow text-gray-700 dark:text-gray-400 gap-8">
+      <div className="flex">
+        <Select
+          name="district"
+          id="district"
+          label="District"
+          value={state.district}
+          onChange={(value) => handleChange("district", value)}
+          className="bg-gray-50"
+        >
+          {/* <Option value="">--Select District--</Option> */}
+          {UP_DISTRICTS.map((item) => (
+            <Option value={item}>{item}</Option>
+          ))}
+        </Select>
+      </div>
+      <div className="flex">
+        <button
+          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full px-8 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          onClick={() =>{
+            setShowCalendar(true);
+            setDateRange([new Date(), new Date()]);
+          } }
+        >
+          {buttonText.includes("Date")
+            ? "Date"
+            : buttonText}
+        </button>
+        {showCalendar && (
+          <Calendar
+            onChange={handleDateChange}
+            selectRange
+            value={dateRange}
+            tileContent={({ date, view }) => {
+              if (view === 'month' && date >= dateRange[0] && date <= dateRange[1]) {
+                return <div className="selected-range"></div>;
+              }
+              return null;
+            }}
+            onRangeChange={handleDateRangeSelect}
+          />
+        )}
+      </div>
+
+
+
+      <div className="flex">
+        <Select
+          name="status"
+          id="status"
+          label="Status"
+          value={state.value}
+          onChange={(value) => handleChange("status", value)}
+          className="bg-gray-50"
+        >
+          {/* <Option value="">--Select Status--</Option> */}
+          <Option value="Approved">Approved</Option>
+          <Option value="Rejected">Rejected</Option>
+          <Option value="In Progress">In Progress</Option>
+          <Option value="OGA Completed">OGA Completed</Option>
+          <Option value="DA Completed">DA Completed</Option>
+          <Option value="Inspection Scheduled">Inspection Scheduled</Option>
+          <Option value="Inspection Delayed">Inspection Delayed</Option>
+          <Option value="Application Submitted">Application Submitted</Option>
+          <Option value="Resubmitted">Resubmitted</Option>
+          <Option value="Returned">Returned</Option>
         </Select>
       </div>
       <div>

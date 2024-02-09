@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useContext } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "../components";
@@ -11,6 +11,11 @@ import APPLICANT_ROUTE_MAP from "../routes/ApplicantRoute";
 import { getCookie, removeCookie } from "../utils";
 import Header from "../components/Header";
 import { applicantService } from "../services";
+import {
+  getFromLocalForage,
+  removeItemFromLocalForage,
+} from "./../forms";
+
 
 export default function PaymentResult() {
   let [params, setParams] = useSearchParams();
@@ -23,9 +28,15 @@ export default function PaymentResult() {
 
   const applicantTransaction = async () => {
     if (params.get("transaction_id")) {
+      const tempStore = await getFromLocalForage(
+        `refNo`
+      );
       const formData = {
         transaction_details: [
-          { id: params.get("transaction_id"), form_id: formId },
+          { id: params.get("transaction_id"),
+           form_id: formId,
+           payment_ref_no: tempStore.refNo
+           }
         ],
       };
       const formsResponse = await applicantService.transactionStatus(formData);
@@ -36,8 +47,12 @@ export default function PaymentResult() {
     }
 
     //email notify
+    // await sendEmailNotification();
+  };
+
+  const sendEmailNotification= async () =>{
     const emailData = {
-      recipientEmail: [`${getCookie("userData")?.userRepresentation?.email}`],
+      recipientEmail: [`${getCookie("userData")?.email}`],
       emailSubject: `Payment Details`,
       emailBody:
         params.get("transaction_amount") && params.get("transaction_id")
@@ -63,12 +78,45 @@ export default function PaymentResult() {
 
     applicantService.sendEmailNotification(emailData);
     removeCookie("payment_ref_no");
-  };
+  }
+
+  const getDataFromLocalForage = async () =>{
+    const formDATA = await getFromLocalForage(
+      `common_payload`
+    );
+    try {
+      console.log(formDATA.paymentStage )
+      if (params.get("resp") && formDATA.paymentStage === "firstStage") {
+  
+        try {
+        // await sendEmailNotification();
+        navigate(
+          `${APPLICANT_ROUTE_MAP.dashboardModule.createForm}/${formDATA?.common_payload.form_name
+          }/${undefined}/${undefined}/${formDATA?.paymentStage}`
+        );
+        } catch (error) {
+          console.log(error)
+        }
+        
+       
+      } else if (params.get("resp")&& formDATA.paymentStage === "secStage")  {
+        console.log("...secStage.......")
+        applicantTransaction();
+      }
+    } catch (error) {
+      console.log(error)
+    } finally {
+      removeItemFromLocalForage(formDATA.paymentStage)
+    }
+ 
+  }
 
   useEffect(() => {
-    if (params.get("resp")) {
-      applicantTransaction();
-    }
+
+    getDataFromLocalForage();
+    
+   
+    
   }, []);
 
   return (

@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import ROUTE_MAP from "../routing/routeMap";
 
 import CommonLayout from "../components/CommonLayout";
 import Button from "../components/Button";
 
-import { login } from "../api";
+import { login, isUserActive } from "../api";
 import { setCookie } from "../utils";
+
+
 
 const LoginMedical = ({ handleStepChangeForLogin }) => {
   const navigate = useNavigate();
@@ -31,46 +33,71 @@ const LoginMedical = ({ handleStepChangeForLogin }) => {
       return;
     }
 
-    const loginRes = await login(username, password);
-    console.log("login-", loginRes.accessToken);
-    const role = loginRes?.userRepresentation?.attributes?.Role?.[0];
-    console.log(role);
-    if (loginRes?.accessToken) {
-      setCookie("userData", loginRes);
-      navigate(ROUTE_MAP.root_star);
-    }
-    if (loginRes?.errors?.length > 0) {
-      if (loginRes?.errors?.[0] === "Credentials have authorization issue") {
-        setError("Invalid Username/ Password");
-      } else {
-        setError(loginRes?.errors?.[0]);
-      }
+    if(!isEmail(username)){
+      setError("Please enter valid email address");
       setTimeout(() => {
         setError("");
       }, 3000);
       return;
     }
 
-    // if (role == "Assessor") {
-    //   setCookie("userData", loginRes?.userRepresentation);
-    //   navigate(ROUTE_MAP.root);
-    // }
-    // if (loginRes.responseCode == "OK" && loginRes.result) {
-    //   let loggedInUser = loginRes.result.data.user;
-    //   setCookie("userData", loggedInUser);
-    //   if (userIsAdminForPortal(loggedInUser.user.registrations)) {
-    //     navigate(ROUTE_MAP.admin);
-    //   } else {
-    //     navigate(ROUTE_MAP.root);
-    //   }
-    //   return;
-    // }
+    try {
+      const userIsValidRes = await isUserActive(username)
+      if (!userIsValidRes.data?.length || userIsValidRes.data[0].attributes.Role[0] !== "Assessor" ) {
+        setError("User not found. Please contact system administrator.");
+        setTimeout(() => {
+          setError("");
+        }, 3000);
+        return
+      }
 
-    setError("An internal server error occurred");
-    setTimeout(() => {
-      setError("");
-    }, 3000);
+      const loginRes = await login(username, password);
+      console.log(loginRes)
+      if (loginRes?.accessToken) {
+        setCookie("userData", loginRes?.userRepresentation);
+        navigate(ROUTE_MAP.root_star);
+      }
+      if (loginRes?.errors?.length > 0) {
+        if (loginRes?.errors?.[0] === "Credentials have authorization issue") {
+          setError("Invalid Username/ Password");
+        } else {
+          setError(loginRes?.errors?.[0]);
+        }
+        setTimeout(() => {
+          setError("");
+        }, 3000);
+        return;
+      }
+
+      if (loginRes?.error) {
+        // console.log(loginRes?.error)
+        loginRes?.error === "Unable to get user details" ? setError("User not found. Please contact administrator") :
+          setError("Invalid Username/ Password");
+        setTimeout(() => {
+          setError("");
+        }, 3000);
+        return
+      }
+
+      setError("An internal server error occurred");
+      setTimeout(() => {
+        setError("");
+      }, 3000);
+
+    } catch (error) {
+      setError("Something went wrong");
+      setTimeout(() => {
+        setError("");
+      }, 3000);
+    }
+
+
   };
+
+
+  const isEmail = (value) => {
+  return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(value)
+  }
 
   return (
     <CommonLayout

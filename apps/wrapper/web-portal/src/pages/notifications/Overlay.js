@@ -31,7 +31,7 @@ export default function Overlay() {
 
   const getAllNotificationsAPI = async () => {
     const postData = {
-      userId: `${getCookie("userData")?.userRepresentation?.id}`,
+      userId: `${getCookie("userData")?.id}`,
       page: 0,
       size: 10,
       sort: { created_date_ts: "desc" },

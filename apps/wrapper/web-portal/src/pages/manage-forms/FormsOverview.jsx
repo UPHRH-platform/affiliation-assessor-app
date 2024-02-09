@@ -239,6 +239,7 @@ const FormsOverview = () => {
             labels: formDetail?.labels,
             assignee: formDetail?.assignee,
             user_id: formDetail?.user_id,
+            last_submission_date:  formDetail?.last_submission_date
           },
         ],
       };

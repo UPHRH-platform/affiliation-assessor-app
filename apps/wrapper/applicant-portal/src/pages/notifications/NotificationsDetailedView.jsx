@@ -31,7 +31,7 @@ export default function NotificationsDetailedView(props) {
   const handleClick = (notification) => {
     if (!notification.read_status) {
       setNotificationReadStatus({
-        userId: `${getCookie("userData")?.userRepresentation?.id}`,
+        userId: `${getCookie("userData")?.id}`,
         status: true,
         notificationIds: [notification.id],
       });
@@ -58,8 +58,10 @@ export default function NotificationsDetailedView(props) {
   };
 
   const getAllNotifications = async () => {
+    console.log("getAllNotificationsgetAllNotificationsgetAllNotificationsgetAllNotifications")
+    console.log(getCookie("userData"))
     const postData = {
-      userId: `${getCookie("userData")?.userRepresentation?.id}`,
+      userId: `${getCookie("userData")?.id}`,
       page: 0,
       size: 10,
       sort: { created_date_ts: "desc" },
@@ -86,7 +88,7 @@ export default function NotificationsDetailedView(props) {
       setselectedNotification(selectedItem);
       if (!selectedItem.read_status) {
         setNotificationReadStatus({
-          userId: `${getCookie("userData")?.userRepresentation?.id}`,
+          userId: `${getCookie("userData")?.id}`,
           status: true,
           notificationIds: [selectedItem.id],
         });

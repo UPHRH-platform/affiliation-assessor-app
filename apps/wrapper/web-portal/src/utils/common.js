@@ -58,7 +58,7 @@ export const readableDate = (dateStr) => {
     "Dec",
   ];
   return (
-    date.getDate() + " " + month[date.getMonth()] + " " + date.getFullYear()
+    date.getDate() + "-" + month[date.getMonth()] + "-" + date.getFullYear()
   );
 };
 

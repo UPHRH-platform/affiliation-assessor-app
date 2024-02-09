@@ -8,6 +8,7 @@ const API_URL = {
   common: {
     registerEvent: `${rest}addEvents`,
     updateForm: `${rest}updateForm`,
+    updateFormStatusForOGA: `${rest}updateFormStatusForOGA`,
     updateRegulatorDeviceId: `${rest}updateRegulatorDeviceId`,
   },
   notifications: {
@@ -19,6 +20,13 @@ const API_URL = {
     getApplicantDeviceId: `${rest}getApplicantDeviceId`,
     emailNotify: `email/notify`,
   },
+  dashboard:{
+    search:`${rest}searchDashboardForms`,
+    filter:`${rest}filterSubmittedFormByRound`,
+    progresscount:`${rest}getInProgressSubmissionCount`,
+    approvedcount:`${rest}getApprovedSubmissionCount`,
+    rejectedcount:`${rest}getRejectedSubmissionsCount`
+  },
   groundAnalysis: {
     viewForm: `${rest}getFormData`,
     list: `${rest}getOGIA`,
@@ -29,6 +37,7 @@ const API_URL = {
     rejectApplicant: `${rest}rejectForm`,
     getGroundInspectionAnalysis: `${rest}getGroundInspectionAnalysis`,
     filterOGA: `${rest}filterOGA`,
+    OGAFormsCount:`${rest}getOGAFormsCountByRoundAndFormStatus`
   },
   manageForms: {
     getForms: `${rest}getForms`,
@@ -43,18 +52,30 @@ const API_URL = {
     filterForms: `${rest}filterForms`,
     createCourses: `${rest}createCourse`,
     updateForms: `${rest}updateForms`,
+    getCourses: `${rest}getCourseMapping`,
+    findForms: `${rest}findForms`,
   },
   manageUsers: {
     getAllAssessors: `${rest}getAllAssessors`,
     getAllRegulators: `${rest}getAllRegulators`,
+    getRegulatorsByRole: `${rest}filterRegulatorByRole`,
     specificUser: `${rest}getSpecificUser`,
     filterUsers: `${rest}filterUsers`,
     setActivate: `${rest}setValid`,
     setDeactive: `${rest}setInvalid`,
+    setRegulatorActive: `${rest}regulator/activate`,
+    setRegulatorDeactive: `${rest}regulator/deactivate`,
     addUsers: `${rest}addUsers`,
     deleteUser: `${rest}deleteUser`,
     editUser: `${rest}editUser`,
     viewSchedule: `${rest}viewSchedule`,
+    getAllInstitutes:  `${rest}getAllInstitutes`,
+  },
+  manageRoles: {
+    getAll: `${rest}getAllRolesWithPermissions`,
+    editRole: `${rest}updateRoleById`,
+    addRole: `${rest}addNewRoleWithPermission`,
+    toggleRoleStatus: `${rest}updateRoleById`,
   },
   desktopAnalysis: {
     getUsersForSchedulingAssessment: `${rest}getUsersForSchedulingAssessment`,
@@ -66,6 +87,7 @@ const API_URL = {
     addInstituteCourse: `${rest}addInstituteCourse`,
     updatePaymentStatus: `${rest}updatePaymentStatus`,
     getTransactionDetail: `v1/user/transaction`,
+    getOGAFormDetails: `${rest}getOGAFormForInspectionSchedule`
   },
   certificateManagement: {
     getNOCCertificate: `${rest}getNOCCertificate`,
@@ -75,7 +97,8 @@ const API_URL = {
     filterAssessments: `${rest}filterAssessments`,
     addAssessmentSchedule: `${rest}addAssessmentSchedule`,
     deleteSchedule: `${rest}deleteSchedule`,
-    getAllSchedule: `${rest}getUpcomingSchedules`
+    getAllSchedule: `${rest}getUpcomingSchedules`,
+    uploadAssessmentSchedule: `${rest}upload/assessor/schedule`,
   },
   viewStatus: {
     getViewStatus: `${rest}getEvents`,
@@ -83,6 +106,13 @@ const API_URL = {
   SIGNUP: {
     CREATE_USER: "create",
     EDIT_USER: "update",
+    CHECK_IS_EMAIL_EXIST: `${rest}findUserByEmail`,
+  },
+  USER: {
+    ACTIVATE: "activate",
+    DEACTIVATE: "deactivate",
+    CHECKVALID: "emaildetails",
+    CREATE_BULK: "keycloak/pushBulkUserBG",
   },
   LOGIN: {
     GENERATE_OTP: "keycloak/otp",

@@ -25,7 +25,6 @@ function ReturnToInstituteModal({
   const userDetails = getCookie("userData");
   const navigate = useNavigate();
 
-  const user_details = userDetails?.userRepresentation;
 
   const handleChange = (e) => {
     setComment(e.target.value);
@@ -57,7 +56,7 @@ function ReturnToInstituteModal({
           entity_id: formId.toString(),
           entity_type: "form",
           event_name: "Rejected",
-          remarks: `${user_details?.firstName} ${user_details?.lastName} has rejected the form with the following remarks ${rejectedRemarks}.`,
+          remarks: `${userDetails?.firstName} ${userDetails?.lastName} has rejected the form with the following remarks ${rejectedRemarks}.`,
         });
 
         updateFormStatus({
@@ -131,7 +130,7 @@ function ReturnToInstituteModal({
             emailBody: `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Your Email Title</title><link href='https://fonts.googleapis.com/css2?family=Mulish:wght@400;600&display=swap' rel='stylesheet'></head><body style='font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;'><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 20px; text-align: center; background-color: #F5F5F5;'><img src='https://regulator.upsmfac.org/images/upsmf.png' alt='Logo' style='max-width: 360px;'></td></tr></table><table width='100%' bgcolor='#ffffff' cellpadding='0' cellspacing='0' border='0'><tr><td style='padding: 36px;'><p style='color: #555555; font-size: 18px; font-family: 'Mulish', Arial, sans-serif;'>Dear ${applicantRes?.data?.institutes[0]?.name},</p><p style='color: #555555; font-size: 18px; line-height: 1.6; font-family: 'Mulish', Arial, sans-serif;'>We hope this email finds you well. We are writing to kindly request the resubmission of your application for the affiliation process. We apologize for any inconvenience caused, but it appears that there was an issue with the initial submission. Following is the reason for rejection ${rejectedRemarks}</p></td></tr></table></body></html>`,
           };
 
-          sendEmailNotification(emailData);
+          // sendEmailNotification(emailData);
         }
         setTimeout(
           () => navigate(`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}`),

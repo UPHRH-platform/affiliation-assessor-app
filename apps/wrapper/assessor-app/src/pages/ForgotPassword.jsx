@@ -6,9 +6,8 @@ import CommonLayout from "../components/CommonLayout";
 import Button from "../components/Button";
 import OtpInput from "react-otp-input";
 
-import { sendOtpToMobile, verifyOtpSavePassword } from "../api";
 import { logout } from "./../utils/index";
-import { generateOTP, getLoginDetails, editUserKeycloak } from "../api";
+import { generateOTP, getLoginDetails, editUserKeycloak, isUserActive } from "../api";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -60,12 +59,12 @@ const ForgotPassword = () => {
     }
 
     const postData = {
-      userName: details.userRepresentation.id,
+      userName: details?.id,
       request: {
-        firstName: details.userRepresentation.firstName,
-        lastName: details.userRepresentation.lastName,
+        firstName: details?.firstName,
+        lastName: details?.lastName,
         enabled: true,
-        email: details.userRepresentation?.email,
+        email: details?.email,
         emailVerified: false,
         credentials: [
           {
@@ -92,8 +91,16 @@ const ForgotPassword = () => {
       return;
     } else {
       setEmail(mobile);
-      let res = await generateOTP(mobile);
-      if (res === "Sending OTP to user mail") setOtpPage(true);
+
+      const uesrResp = await isUserActive(mobile)
+      if(uesrResp?.data[0] && uesrResp?.data[0].enabled && uesrResp?.data[0].attributes?.Role[0] === "Assessor"){
+        let res = await generateOTP(mobile);
+        if (res === "Sending OTP to user mail") setOtpPage(true);
+      } else {
+        setError("User Not Found. Please contact system admin.");
+        setTimeout(() => setError(false), 3000);
+      }
+    
     }
   };
 
@@ -113,6 +120,11 @@ const ForgotPassword = () => {
     setDetails(loginRes.data);
     // const res = await verifyOtpSavePassword(mobile, newPass, otp);
     if (loginRes.status === 200) {
+      if(loginRes.data.error === "OTP mismatch"){
+        setError("Wrong OTP entered");
+        setTimeout(() => setError(false), 3000);
+        return;
+      }
       setChangePasswordPage(true);
       setOtpPage(false);
     } else if (loginRes?.params?.err == "INVALID_OTP_USERNAME_PAIR") {
@@ -165,7 +177,7 @@ const ForgotPassword = () => {
     >
       {/* Entering email id for password change */}
       {!otpPage && !changePasswordPage && !passChanged && (
-        <div className="flex flex-col px-3 py-8 h-100 justify-between h-[90%]">
+        <div className="flex flex-col px-3 py-8 h-5/6 justify-between h-[90%]">
           <div className="w-full">
             <p className="text-secondary text-2xl font-bold">
               Enter a valid email id
@@ -182,21 +194,24 @@ const ForgotPassword = () => {
                 {error.length ? error : "Please enter a valid email id"}
               </p>
             )}
-          </div>
-          <Button text="Next" onClick={handleVerifyEmail} />
-        </div>
+           </div>
+            
+          <button className="w-full p-2 flex justify-center border" 
+           onClick={handleVerifyEmail} >Next</button>
+         </div>
       )}
 
       {/* Entering OTP to change the password  */}
       {otpPage && !passChanged && (
-        <div className="flex flex-col px-3 py-8 h-100 justify-between h-[90%]">
+        <div className="flex flex-col px-3 py-8 h-5/6 justify-between h-[90%]">
           <div className="w-full">
             <p className="text-secondary text-xl lg:text-2xl font-bold">
-              Enter OTP sent on
+              Enter OTP sent on  :
+              <span className="text-primary text-xl lg:text-3xl  py-4">
+              &nbsp;{mobile}
+            </span>
             </p>
-            <p className="text-primary text-2xl lg:text-3xl font-bold py-4">
-              {email}
-            </p>
+            
             <style>
               {`
                 .error-otp {
@@ -223,6 +238,27 @@ const ForgotPassword = () => {
               errorStyle={"animate__animated animate__headShake error-otp"}
               shouldAutoFocus={true}
             />
+            {/*  <OtpInput
+      value={otp}
+      onChange={setOtp}
+      numInputs={6}
+      renderSeparator={<span>-</span>}
+      renderInput={(props) => <input {...props} />}
+      shouldAutoFocus={true}
+      containerStyle={"w-full py-6"}
+      inputStyle={{
+        border: "1px solid #9b9b9b",
+        borderRadius: "0.25rem",
+        marginRight: "8px",
+        height: "3rem",
+        width: "3rem",
+        fontSize: "1.5rem",
+        color: "rgba(0,0,0,0.5)",
+      }}
+      isInputNum
+      hasErrored={error}
+      errorStyle={"animate__animated animate__headShake error-otp"}
+    /> */}
             {error && (
               <p className="text-red-500 text-sm font-bold py-1">{error} </p>
             )}
@@ -233,7 +269,7 @@ const ForgotPassword = () => {
 
       {/* Change password page  */}
       {!otpPage && changePasswordPage && !passChanged && (
-        <div className="flex flex-col px-3 py-8 h-100 justify-between h-[90%]">
+        <div className="flex flex-col px-3 py-8 h-5/6 justify-between h-[90%]">
           <div className="w-full">
             <p className="text-secondary text-xl font-bold">
               Change Password Here

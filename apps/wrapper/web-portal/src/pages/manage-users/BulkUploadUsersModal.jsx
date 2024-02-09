@@ -5,12 +5,10 @@ import { Switch } from "@material-tailwind/react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components";
 import {
-  addUsers,
-  createBulkUserHasura,
-  createBulkUsersKeyCloak,
+  createBulkUsers,
 } from "../../api";
 import { userService } from "../../api/userService";
-import { removeCookie, setCookie } from "../../utils/common";
+import { getCookie } from "../../utils/common";
 import { ContextAPI } from "../../utils/ContextAPI";
 
 function BulkUploadUsersModal({ closeBulkUploadUsersModal, setUsersCreated }) {
@@ -93,30 +91,37 @@ function BulkUploadUsersModal({ closeBulkUploadUsersModal, setUsersCreated }) {
     },
     {
       Header: "First Name",
-      accessor: "fname",
+      accessor: "firstName",
       Cell: (props) => {
         return <div>{isDataValid(props.value)}</div>;
       },
     },
     {
       Header: "Last Name",
-      accessor: "lname",
+      accessor: "lastName",
       Cell: (props) => {
         return <div>{isDataValid(props.value)}</div>;
       },
     },
     {
       Header: "Mobile Number",
-      accessor: "mobile_number",
+      accessor: "phoneNumber",
       Cell: (props) => {
         return <div>{ismobileNumberValid(props.value)}</div>;
       },
     },
     {
       Header: "Role",
-      accessor: "role",
+      accessor: "roleName",
       Cell: (props) => {
         return <div>{isDataValid(props.value)}</div>;
+      },
+    },
+    {
+      Header: "code",
+      accessor: "code",
+      Cell: (props) => {
+        return <div>{(props.value)}</div>;
       },
     },
   ];
@@ -127,6 +132,8 @@ function BulkUploadUsersModal({ closeBulkUploadUsersModal, setUsersCreated }) {
 
   const handleChange = (e) => {
     const fileUploaded = e.target.files[0];
+    console.log(fileUploaded)
+
     setFile(fileUploaded.name.substring(0, fileUploaded.name.lastIndexOf(".")));
     handleFile(fileUploaded);
   };
@@ -162,20 +169,24 @@ function BulkUploadUsersModal({ closeBulkUploadUsersModal, setUsersCreated }) {
         object[header.trim()] = values[index]?.trim()?.replace("\r", "");
         return object;
       }, {});
-      obj["full_name"] = obj?.fname + " " + obj?.lname;
+      obj["full_name"] = obj?.firstName + " " + obj?.lastName;
       if (
         !emailExp.test(obj?.email?.toString()) ||
-        !mobNumberExp.test(obj?.mobile_number?.toString()) ||
-        obj?.fname == "" ||
-        obj?.lname == "" ||
+        !mobNumberExp.test(obj?.phoneNumber?.toString()) ||
+        obj?.firstName == "" ||
+        obj?.lastName == "" ||
         obj?.email == "" ||
-        obj?.mobile_number == "" ||
-        obj?.role == ""
+        obj?.phoneNumber == "" ||
+        obj?.roleName == ""
       ) {
         obj["isRowInvalid"] = true;
         invalidUserData.push(obj);
       }
-
+      if( obj?.roleName === "Assessor"  && isNaN(parseInt(obj?.code)) )
+      {
+        obj["isRowInvalid"] = true;
+        invalidUserData.push(obj);
+      }
       return obj;
     });
 
@@ -190,97 +201,45 @@ function BulkUploadUsersModal({ closeBulkUploadUsersModal, setUsersCreated }) {
   };
 
   const createUsers = async () => {
-    let errorFlag = false;
-    let postDataKeyCloak = {};
 
-    let postDataHasura = {
-      assessors: [],
-      regulators: [],
-    };
-
-    console.log("Keycloak - ", postDataKeyCloak);
     try {
       setSpinner(true);
-      let accessTokenObj = {
-        grant_type: "client_credentials",
-        client_id: "admin-api",
-        client_secret: "edd0e83d-56b9-4c01-8bf8-bad1870a084a",
-      };
-      setCookie("access_token", process.env.REACT_APP_AUTH_TOKEN);
-
-      //keycloak API call
-      selectedRows.map(async (item) => {
-        postDataKeyCloak = {
-          request: {
-            firstName: item.values.fname,
-            lastName: item.values.lname,
-            email: item.values.email,
-            username: item.values.email,
-            enabled: true,
-            emailVerified: false,
-            credentials: [
-              {
-                type: "password",
-                value: `${item.values.mobile_number}`,
-                temporary: "false",
-              },
-            ],
-            attributes: {
-              Role: item.values.role,
-            },
-          },
-        };
-
-        const keycloakRes = await createBulkUsersKeyCloak(postDataKeyCloak);
-        console.log("keycloak response - ", keycloakRes);
-        if (keycloakRes?.data) {
-          if (item.values.role === "Assessor") {
-            postDataHasura["assessors"].push({
-              code: `${Math.floor(1000 + Math.random() * 9000)}`,
-              user_id: keycloakRes.data,
-              email: item.values.email,
-              name: item.values.full_name,
-              phonenumber: item.values.mobile_number,
-              fname: item.values.fname,
-              lname: item.values.lname,
-              role: item.values.role,
-            });
+      const updatedReqBody = []
+      //const emailID = getCookie("userData")?.email;
+      tableUserList.forEach((user) => {
+        updatedReqBody.push(
+          {
+            username: user.email,
+            password: user.phoneNumber,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            roleName: user.roleName,
+            phoneNumber:  user.phoneNumber,
+            code:  user.code
           }
-          if (item.values.role === "Desktop-Admin") {
-            postDataHasura["regulators"].push({
-              user_id: keycloakRes.data,
-              email: item.values.email,
-              full_name: item.values.full_name,
-              phonenumber: item.values.mobile_number,
-              fname: item.values.fname,
-              lname: item.values.lname,
-              role: item.values.role,
-            });
-          }
-        }
-      });
-      setTimeout(async () => {
-        console.log(postDataHasura);
-        //Hasura API call
-        const hasuraRes = await createBulkUserHasura(postDataHasura);
-        setUsersCreated(true);
-        if (hasuraRes.status !== 200) {
-          errorFlag = true;
-        }
-      }, 3000);
-
-      if (!errorFlag) {
-        setToast((prevState) => ({
-          ...prevState,
-          toastOpen: true,
-          toastMsg: "User(s) Created Successfully!!",
-          toastType: "success",
-        }));
-        closeBulkUploadUsersModal(false);
+        )
+      })
+      const postDataKeyCloak = {
+        userCreationList: updatedReqBody,
+        email: getCookie("userData")?.email
       }
-      removeCookie("access_token");
+      const keycloakRes = await createBulkUsers(postDataKeyCloak);
+      //keycloak API call
+      if (keycloakRes?.data) {
+          setToast((prevState) => ({
+            ...prevState,
+            toastOpen: true,
+            toastMsg: "User(s) creation request aknowledged. You would be intimidated via email",
+            toastType: "success",
+          }));
+          closeBulkUploadUsersModal(false);
+      }
+  
+     
     } catch (error) {
-      const errorMessage = JSON.parse(error?.config?.data).regulators[0]?.user_id?.errorMessage
+      console.log(error)
+      const errorMessage = JSON.parse(error?.config?.data).regulators[0]?.user_id?.errorMessage || "Something went wrong. Please try again later."
         setToast((prevState) => ({
           ...prevState,
           toastOpen: true,

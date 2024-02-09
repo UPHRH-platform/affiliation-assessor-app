@@ -220,7 +220,7 @@ const CaptureLocation = () => {
           : ROUTE_MAP.assessment_type
       }
       logoutDisabled
-      iconType="close"
+      // iconType="close"
       pageTitle="1. Capture Location"
       pageDesc="Enable location in your mobile settings and capture Institute's location"
     >

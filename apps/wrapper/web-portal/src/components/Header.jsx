@@ -13,6 +13,10 @@ import {
 } from "@material-tailwind/react";
 import Overlay from "./../pages/notifications/Overlay";
 
+import {
+  removeAllFromLocalForage,
+} from "./../forms";
+
 export default function Header() {
   const [showButtons, setshowButtons] = useState(false);
   const navigate = useNavigate();
@@ -20,11 +24,12 @@ export default function Header() {
   const userData = getCookie("userData");
   const instituteData = getCookie("institutes");
 
-  const logout = () => {
+  const logout = async () => {
     removeCookie("userData");
     removeCookie("institutes");
     removeCookie("regulator");
     removeCookie("firebase_client_token")
+    removeAllFromLocalForage();
     navigate(ADMIN_ROUTE_MAP.loginModule.login);
   };
 
@@ -63,7 +68,7 @@ export default function Header() {
                         aria-haspopup="true"
                       >
                         {getInitials(
-                          `${userData?.userRepresentation?.firstName?.trim()} ${userData?.userRepresentation?.lastName?.trim()}`
+                          `${userData?.firstName?.trim()} ${userData?.lastName?.trim()}`
                         )}
                       </button>
                     </MenuHandler>

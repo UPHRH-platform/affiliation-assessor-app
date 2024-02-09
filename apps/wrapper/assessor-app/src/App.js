@@ -49,6 +49,8 @@ function App() {
   const [state, setState] = useState();
   useEffect(() => {
     const user = getCookie("userData");
+    console.log("REACT_APP_WEB_PORTAL_USER_SERVICE_URL-->", process.env.REACT_APP_WEB_PORTAL_USER_SERVICE_URL )
+
   }, []);
   return (
     <div className="App">

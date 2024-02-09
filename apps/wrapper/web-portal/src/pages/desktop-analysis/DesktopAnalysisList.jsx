@@ -4,21 +4,23 @@ import { useNavigate } from "react-router-dom";
 import { Select, Option } from "@material-tailwind/react";
 
 import FilteringTable from "../../components/table/FilteringTable";
-import Card from "../../components/Card";
 import Nav from "../../components/Nav";
+import { getCookie } from "../../utils";
 import { ContextAPI } from "../../utils/ContextAPI";
+import { Button } from "../../components";
+
 
 import {
   filterDesktopAnalysis,
   getDesktopAnalysisForms,
   markReviewStatus,
   searchDesktop,
-  registerEvent,
   getTransactionDetail,
+  exportToExcel
 } from "../../api";
 import {
-  getFieldName,
   readableDate,
+  formatDate,
   getLocalTimeInISOFormat,
 } from "../../utils/common";
 import ADMIN_ROUTE_MAP from "../../routes/adminRouteMap";
@@ -36,10 +38,12 @@ const DesktopAnalysisList = () => {
     limit: 10,
     totalCount: 0,
   });
+  const loggedInUserRole = getCookie("userData").attributes.Role[0];
+
   const [paymentModal, setPaymentModal] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const { setSpinner } = useContext(ContextAPI);
+  const { setSpinner, setToast } = useContext(ContextAPI);
   const [selectedRound, setSelectedRound] = useState(1);
   const [viewPaymentModal, setViewPaymentModal] = useState({
     flag: false,
@@ -63,7 +67,7 @@ const DesktopAnalysisList = () => {
       accessor: "application_type",
     },
     {
-      Header: "Course Type",
+      Header: "Course Name",
       accessor: "course_name",
     },
     {
@@ -83,6 +87,36 @@ const DesktopAnalysisList = () => {
       accessor: "schedule",
     },
   ];
+  const REJECTEDCOLUMNS = [
+    {
+      Header: "Form title",
+      accessor: "form_title",
+    },
+    {
+      Header: "Application type",
+      accessor: "application_type",
+    },
+    {
+      Header: "Course Name",
+      accessor: "course_name",
+    },
+    {
+      Header: "Date",
+      accessor: "reviewed_on",
+    },
+    {
+      Header: "Status",
+      accessor: "status",
+    },
+    // {
+    //   Header: "Payment status",
+    //   accessor: "payment_status",
+    // },
+    {
+      Header: "",
+      accessor: "schedule",
+    },
+  ]
   const NEWCOLUMNS = [
     {
       Header: "Form title",
@@ -184,24 +218,43 @@ const DesktopAnalysisList = () => {
   ]);
 
   const fetchDesktopAnalysisForms = async () => {
-    const postData = {
-      offsetNo: paginationInfo.offsetNo,
-      limit: paginationInfo.limit,
-      round: selectedRound,
-      formStatus: state.menu_selected,
-    };
-    try {
-      setSpinner(true);
-      const res = await getDesktopAnalysisForms(postData);
-      setPaginationInfo((prevState) => ({
-        ...prevState,
-        totalCount: res.data.form_submissions_aggregate.aggregate.totalCount,
-      }));
-      setFormsList(res?.data?.form_submissions);
-    } catch (error) {
-      console.log("error - ", error);
-    } finally {
-      setSpinner(false);
+    if(state.menu_selected === "Inspection Scheduled"){
+       const  condition= {
+            assessor_id: {
+                _is_null: true
+            },
+            round: {
+                _eq: selectedRound
+            },
+            form_status: {
+                _eq: state.menu_selected,
+            }
+        }
+      filterApiCall(condition);
+    } else {
+      const postData = {
+        offsetNo: paginationInfo.offsetNo,
+        limit: paginationInfo.limit,
+        round: selectedRound,
+        formStatus: state.menu_selected,
+      };
+      try {
+        setSpinner(true);
+        const res = await getDesktopAnalysisForms(postData);
+        setPaginationInfo((prevState) => ({
+          ...prevState,
+          totalCount: res.data.form_submissions_aggregate.aggregate.totalCount,
+        }));
+        //console.log(res?.data?.form_submissions);
+      
+        console.log(res?.data?.form_submissions);
+        setFormsList(res?.data?.form_submissions);
+      } catch (error) {
+        console.log("error - ", error);
+      } finally {
+        setSpinner(false);
+      }
+
     }
   };
 
@@ -274,23 +327,93 @@ const DesktopAnalysisList = () => {
   };
 
   const handleViewPayment = async (e) => {
-    const transactionRes = await getTransactionDetail(
-      e.transaction_details[0]?.id
-    );
-    setViewPaymentModal((prevState) => ({
-      paymentDetails: {
-        ...prevState.paymentDetails,
-        dateTime: readableDate(transactionRes?.data?.transactionDate),
-        transactionId: transactionRes?.data?.uniqueRefNumber,
-        amount: transactionRes?.data?.totalAmount,
-        collegeName: e.institute.name,
-        paymentStatus: transactionRes?.data?.transaction_status,
-      },
-      flag: true,
-    }));
+    if (e.transaction_details[0]) {
+      const transactionRes = await getTransactionDetail(
+        e.transaction_details[0]?.id
+      );
+      setViewPaymentModal((prevState) => ({
+        paymentDetails: {
+          ...prevState.paymentDetails,
+          dateTime: readableDate(transactionRes?.data?.transactionDate),
+          transactionId: transactionRes?.data?.uniqueRefNumber,
+          amount: transactionRes?.data?.totalAmount,
+          collegeName: e.institute.name,
+          paymentStatus: transactionRes?.data?.transaction_status,
+        },
+        flag: true,
+      }));
+    }
+    else {
+      setToast((prevState) => ({
+        ...prevState,
+        toastOpen: true,
+        toastMsg: "Failed to load payment details",
+        toastType: "error",
+      }));
+    }
   };
 
+  const downloadReport = async () => {
+    console.log("here")
+    if (paginationInfo.totalCount > 0) {
+      const postData = {
+        formStatus: "DA Completed",
+        offsetNo: 0,
+        limit: paginationInfo.totalCount,
+        round: selectedRound
+      };
+      try {
+        setSpinner(true);
+        const res = await getDesktopAnalysisForms(postData);
+        // setFormsList(res?.data?.form_submissions);
+        //console.log('DesktopAnalysisForms: ', res?.data?.form_submissions);
+        const daCompletedFormsReport = {
+          sheetName: 'report',
+          downloadObject: [],
+          headers: ['FORM ID', 'FORM TITLE', 'APPLICATION TYPE', 'COURSE TYPE', 'DATE', 'FORM STATUS', 'PAYMENT STATUS', 'ASSESSOR ID']
+
+        }
+
+        res?.data?.form_submissions.forEach((element) => {
+
+          if (element?.payment_status === "Paid") {
+            const report = {
+              form_id: element.form_id,
+              form_title: element.course.course_name,
+              application_type: element.course.application_type || "-",
+              course_type: element?.course_type || "-",
+              date: element?.submitted_on || "-",
+              // course_level: element?.course_level || "-",
+              form_status: element?.form_status,
+              payment_status: element?.payment_status || "-",
+            }
+            daCompletedFormsReport.downloadObject.push(report)
+          }
+        })
+        const arr = daCompletedFormsReport.downloadObject
+        daCompletedFormsReport.downloadObject = arr.sort((p1, p2) => (p1.date < p2.date) ? 1 : (p1.date > p2.date) ? -1 : 0);
+        // const roundName = selectedRound === 1 ? 'Round One' : 'Round Two'
+        const downloadObjects = {
+          fileName: `${formatDate(new Date())}_DA_COMPLETED.xlsx`,
+          objectsList: [daCompletedFormsReport]
+        }
+        exportToExcel(downloadObjects);
+        setSpinner(false);
+      } catch (error) {
+        console.log("error - ", error);
+        setSpinner(false);
+        setToast((prevState) => ({
+          ...prevState,
+          toastOpen: true,
+          toastMsg: "Failed to download excel file",
+          toastType: "error",
+        }));
+      }
+    }
+  }
+
   formsList?.forEach((e) => {
+    //console.log("e =>", e);
     let applicationType = e?.course?.application_type?.replace("_", " ");
     var formsData = {
       form_title: (
@@ -305,18 +428,21 @@ const DesktopAnalysisList = () => {
       application_type:
         applicationType?.charAt(0).toUpperCase() +
         applicationType?.substring(1).toLowerCase(),
-      course_name: e?.course_type || "NA",
+      course_name: `${e?.course_type} - ${e?.course_level}` || "NA",
+      // course_name: `${e?.course?.course_type} - ${e?.course?.course_level}` || "NA",
+
       published_on: readableDate(e?.submitted_on),
+      reviewed_on: readableDate(e?.reviewed_on),
       id: e.form_id,
       status: e?.form_status || "NA",
       payment_status: (
         <div
           className={`px-6 text-primary-600 pl-0`}
           onClick={
-            e?.payment_status === "Paid" ? () => handleViewPayment(e) : () => {}
+            (e?.payment_status === "Paid" || e?.payment_status === "Initiated") ? () => handleViewPayment(e) : () => { }
           }
         >
-          {e?.payment_status === "Paid"
+          {(e?.payment_status === "Paid" || e?.payment_status === "Initiated")
             ? "View Payment Detail"
             : e?.payment_status || "NA"}
         </div>
@@ -397,6 +523,18 @@ const DesktopAnalysisList = () => {
                 </div>
               </div>
             </div>
+            {state.menu_selected === "DA Completed" && (
+              <div className="sm:col-span-3 flex justify-end">
+                <Button
+                  onClick={() => {
+                    downloadReport();
+                  }}
+                  moreClass="border boevent_namerder-blue-500 bg-white text-blue-500 "
+                  text="Download DA Completed forms as excel file"
+                ></Button>
+              </div>)
+            }
+
           </div>
 
           <div className="flex flex-col gap-4">
@@ -407,80 +545,79 @@ const DesktopAnalysisList = () => {
               >
                 <a
                   href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "Application Submitted"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "Application Submitted"
                       ? "text-blue-600 border-b-2 border-blue-600"
                       : ""
-                  }`}
+                    }`}
                 >
-                  New
+                  New Forms Submitted
+                </a>
+              </li>
+              <li className="" onClick={() => handleSelectMenu("Returned")}>
+                <a
+                  href="#"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "Returned"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : ""
+                    }`}
+                >
+                  Returned to institute
                 </a>
               </li>
               <li className="" onClick={() => handleSelectMenu("Resubmitted")}>
                 <a
                   href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "Resubmitted"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "Resubmitted"
                       ? "text-blue-600 border-b-2 border-blue-600"
                       : ""
-                  }`}
+                    }`}
                 >
-                  Resubmitted
+                  Resubmitted for DA
                 </a>
               </li>
               <li className="" onClick={() => handleSelectMenu("DA Completed")}>
                 <a
                   href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "DA Completed"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "DA Completed"
                       ? "text-blue-600 border-b-2 border-blue-600"
                       : ""
-                  }`}
+                    }`}
                   aria-current="page"
                 >
                   DA Completed
                 </a>
               </li>
-              <li
-                className=""
-                onClick={() => handleSelectMenu("Inspection Scheduled")}
-              >
-                <a
-                  href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "Inspection Scheduled"
+
+              {loggedInUserRole !== "Desktop-Assessor" && (
+                < li
+                  className=""
+                  onClick={() => handleSelectMenu("Inspection Scheduled")}
+                >
+                  <a
+                    href="#"
+                    className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "Inspection Scheduled"
                       ? "text-blue-600 border-b-2 border-blue-600"
                       : ""
-                  }`}
-                >
-                  Sent for Inspection
-                </a>
-              </li>
+                      }`}
+                  >
+                    On-ground Inspection Scheduled
+                  </a>
+                </li>
+              )}
               <li className="" onClick={() => handleSelectMenu("Rejected")}>
                 <a
                   href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "Rejected"
+                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${state.menu_selected === "Rejected"
                       ? "text-blue-600 border-b-2 border-blue-600"
                       : ""
-                  }`}
+                    }`}
                   aria-current="page"
                 >
-                  Rejected
+                  Application Rejected
                 </a>
               </li>{" "}
-              <li className="" onClick={() => handleSelectMenu("Returned")}>
-                <a
-                  href="#"
-                  className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
-                    state.menu_selected === "Returned"
-                      ? "text-blue-600 border-b-2 border-blue-600"
-                      : ""
-                  }`}
-                >
-                  Returned to institute
-                </a>
-              </li>
+
+
             </ul>
 
             {/* table creation starts here */}
@@ -489,10 +626,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
+                  navigateFunc={() => { }}
                   columns={COLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -508,10 +645,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
+                  navigateFunc={() => { }}
                   columns={COLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -527,10 +664,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
+                  navigateFunc={() => { }}
                   columns={COLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -546,10 +683,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
-                  columns={COLUMNS}
+                  navigateFunc={() => { }}
+                  columns={REJECTEDCOLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -565,10 +702,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
+                  navigateFunc={() => { }}
                   columns={NEWCOLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -584,10 +721,10 @@ const DesktopAnalysisList = () => {
                 <FilteringTable
                   dataList={formsDataList}
                   // navigateFunc={navigateToView}
-                  navigateFunc={() => {}}
+                  navigateFunc={() => { }}
                   columns={COLUMNS}
                   pagination={true}
-                  onRowSelect={() => {}}
+                  onRowSelect={() => { }}
                   filterApiCall={filterApiCall}
                   showFilter={true}
                   showSearch={true}
@@ -612,7 +749,7 @@ const DesktopAnalysisList = () => {
       {paymentModal && (
         <PaymentModal
           closeViewSchedulesModal={setPaymentModal}
-          // scheduleUserData={scheduleUserData}
+        // scheduleUserData={scheduleUserData}
         ></PaymentModal>
       )}
     </>

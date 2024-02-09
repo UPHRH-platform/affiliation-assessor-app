@@ -46,3 +46,47 @@ body, .react-calendar {
 .active {
   color: #2563eb;
 }
+
+.counter{
+  border-radius: 50px;
+  border-width:1px;
+  border-style: solid;
+  padding: 8px;
+}
+
+.count-indicator-completed{
+  border-color: black;
+  color:black;
+}
+
+.count-indicator-approved{
+  border-color: green;
+  color:green;
+}
+
+.count-indicator-rejected{
+  border-color: red;
+  color:red;
+}
+
+.count-indicator-returned{
+  border-color: orange;
+  color:orange;
+}
+ 
+.flex-parent-element {
+  display: flex;
+}
+
+.flex-child-element {
+  flex: 1;
+  margin: 10px;
+}
+
+.flex-child-element:first-child {
+  margin-right: 20px;
+}
+
+.overflow{
+  overflow: scroll;
+}

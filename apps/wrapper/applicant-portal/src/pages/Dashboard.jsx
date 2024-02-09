@@ -7,12 +7,12 @@ import APPLICANT_ROUTE_MAP from "../routes/ApplicantRoute";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  useEffect(()=>{
-    let userDetails = getCookie("userData")
-    if(userDetails?.userRepresentation?.username){
-      navigate(APPLICANT_ROUTE_MAP.dashboardModule.my_applications)
-    }
-  },[])
+  // useEffect(()=>{
+  //   let userDetails = getCookie("userData")
+  //   if(userDetails?.userRepresentation?.username){
+  //     navigate(APPLICANT_ROUTE_MAP.dashboardModule.my_applications)
+  //   }
+  // },[])
   return (
     <div className="flex flex-col">
       <Header />

@@ -36,6 +36,10 @@ import FormsOverview from "./pages/manage-forms/FormsOverview";
 import CreateForm from "./pages/manage-forms/CreateForm";
 import UploadForm from "./pages/manage-forms/UploadForm";
 
+import ManageRolesList from "./pages/role-management/ManageRolesList";
+import ManageRole from "./pages/role-management/ManageRole";
+import CreateUpdateRole from "./pages/role-management/CreateUpdateRole";
+
 import DesktopAnalysisList from "./pages/desktop-analysis/DesktopAnalysisList";
 import DesktopAnalysisView from "./pages/desktop-analysis/DesktopAnalysisView";
 import CertificateManagement from "./pages/certificate-management/CertificateManagement";
@@ -53,9 +57,11 @@ import { ContextAPI } from "./utils/ContextAPI";
 import { getCookie, getLocalTimeInISOFormat } from "./utils";
 import Toast from "./components/Toast";
 
+
 function App() {
-  console.log("Good afternoon Sharath !!!!!!!")
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const loggedInUser = getCookie("regulator")?.[0];
+ 
   const [spinner, setSpinner] = useState(false);
   const [toast, setToast] = useState({
     toastOpen: false,
@@ -64,7 +70,7 @@ function App() {
   });
 
   const messaging = getMessaging(fireBaseApp);
-   const onMessageListener = (async () => {
+  const onMessageListener = (async () => {
     const messagingResolve = await messaging;
     if (messagingResolve) {
       onMessage(messagingResolve, (payload) => {
@@ -77,22 +83,35 @@ function App() {
         }));
       });
     }
-  })(); 
+  })();
 
   useEffect(() => {
     getPermissionForToken();
+
+setInterval(() => {
+ // console.log("checking conn",navigator.onLine)
+  if(!navigator.onLine){
+    setToast((prevState) => ({
+      ...prevState,
+      toastOpen: true,
+      toastMsg: "You seem to be offline. Please check your internet connection.",
+      toastType: "error",
+    }));
+  }
+}, 5000);
+
   }, []);
 
   useEffect(() => {
-    if (toast) {
-    /*   setTimeout(() => {
+    if (toast?.toastOpen) {
+      setTimeout(() => {
         setToast({
           toastOpen: false,
           toastMsg: "",
           toastType: "",
         });
-      }, 3000); */
-      
+      }, 3000);
+
     }
   }, [toast]);
 
@@ -106,7 +125,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             {/* Default landing page */}
-          {   <Route path="/" element={<Navigate to="/auth/login" />} /> }
+            {<Route path="/" element={<Navigate to="/auth/login" />} />}
 
             {/* Register and Login Routes */}
             <Route path={ADMIN_ROUTE_MAP.auth} element={<Authenticate />}>
@@ -124,11 +143,41 @@ function App() {
               ></Route> */}
             </Route>
 
-            {/* Dashboard routing starts here */}
+            {loggedInUser?.role === "Desktop-Assessor" &&
+                (
+                  <Route
+                    path={ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}
+                    element={<DesktopAnalysis />}
+                  >
+                    <Route index element={<DesktopAnalysisList />}></Route>
+                    <Route
+                      path={`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.viewForm}/:formName/:formId`}
+                      element={<DesktopAnalysisView />}
+                    ></Route>
+                  </Route>
+
+                )}
+               
             <Route
             >
-              {loggedInUser?.role === "Super-Admin" && (
-                <Route
+             
+              <Route
+                path="*"
+                element={
+                  <Navigate
+                    to={`${loggedInUser?.role === "Super-Admin"
+                      ? ADMIN_ROUTE_MAP.adminModule.manageUsers.home
+                      : ADMIN_ROUTE_MAP.adminModule.manageForms.home
+                      }`}
+                  />
+                }
+              />
+            </Route>
+            {(() => {
+        switch (loggedInUser?.role) {
+          case 'Super-Admin':
+            return <Route>          
+                  <Route
                   path={ADMIN_ROUTE_MAP.adminModule.manageUsers.home}
                   element={<ManageUser />}
                 >
@@ -138,94 +187,194 @@ function App() {
                     element={<AdminCreateUser />}
                   ></Route>
                 </Route>
-              )}
 
-              {/* Notifications routing starts here */}
+            {/* Notifications routing starts here */}
+            <Route
+              path={`${ADMIN_ROUTE_MAP.adminModule.notifications.home}/:notificationId?`}
+              element={<Notification />}
+            >
+              <Route index element={<NotificationsDetailedView />}></Route>
+            </Route>
+            {/*Manage forms routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.manageForms.home}
+              element={<ManageForms />}
+            >
+              <Route index element={<FormsOverview />}></Route>
               <Route
-                path={`${ADMIN_ROUTE_MAP.adminModule.notifications.home}/:notificationId?`}
-                element={<Notification />}
-              >
-                <Route index element={<NotificationsDetailedView />}></Route>
-              </Route>
-              {/*Manage forms routing starts here */}
+                path={ADMIN_ROUTE_MAP.adminModule.manageForms.createForm}
+                element={<CreateForm />}
+              ></Route>
               <Route
-                path={ADMIN_ROUTE_MAP.adminModule.manageForms.home}
-                element={<ManageForms />}
-              >
-                <Route index element={<FormsOverview />}></Route>
-                <Route
-                  path={ADMIN_ROUTE_MAP.adminModule.manageForms.createForm}
-                  element={<CreateForm />}
-                ></Route>
-                <Route
-                  path={ADMIN_ROUTE_MAP.adminModule.manageForms.upload}
-                  element={<UploadForm />}
-                ></Route>
-                <Route
-                  path={`${ADMIN_ROUTE_MAP.adminModule.manageForms.viewForm}/:formName/:formId`}
-                  element={<CreateForm />}
-                ></Route>
-              </Route>
+                path={ADMIN_ROUTE_MAP.adminModule.manageForms.upload}
+                element={<UploadForm />}
+              ></Route>
               <Route
-                path={ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}
-                element={<DesktopAnalysis />}
-              >
-                <Route index element={<DesktopAnalysisList />}></Route>
-                <Route
-                  path={`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.viewForm}/:formName/:formId`}
-                  element={<DesktopAnalysisView />}
-                ></Route>
-              </Route>
-              {/*Ground Inspection routing starts here  */}
+                path={`${ADMIN_ROUTE_MAP.adminModule.manageForms.viewForm}/:formName/:formId`}
+                element={<CreateForm />}
+              ></Route>
+            </Route>
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}
+              element={<DesktopAnalysis />}
+            >
+              <Route index element={<DesktopAnalysisList />}></Route>
               <Route
-                path={ADMIN_ROUTE_MAP.adminModule.onGroundInspection.home}
-                element={<GroundInspectionAnalysis />}
-              >
-                <Route index element={<GroundInspectionListForms />}></Route>
-                <Route
-                  path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.viewForm}/:formName/:formId/:instituteName/:round/:date`}
-                  element={<GroundInspectionViewForm />}
-                ></Route>
+                path={`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.viewForm}/:formName/:formId`}
+                element={<DesktopAnalysisView />}
+              ></Route>
+            </Route>
+            {/*Ground Inspection routing starts here  */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.onGroundInspection.home}
+              element={<GroundInspectionAnalysis />}
+            >
+              <Route index element={<GroundInspectionListForms />}></Route>
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.viewForm}/:formName/:formId/:instituteName/:round/:date`}
+                element={<GroundInspectionViewForm />}
+              ></Route>
 
-                <Route
-                  path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.nocIssued}/:round`}
-                  element={<NocIssued />}
-                ></Route>
-              </Route>
-              {/* Certificate management routing starts here */}
               <Route
-                path={ADMIN_ROUTE_MAP.adminModule.certificateManagement.home}
-                element={<CertificateManagement />}
-              >
-                <Route index element={<CertificateManagementList />}></Route>
-              </Route>
-              {/* Schedule management routing starts here */}
-              <Route
-                path={ADMIN_ROUTE_MAP.adminModule.scheduleManagement.home}
-                element={<ScheduleManagement />}
-              >
-                <Route index element={<ScheduleManagementList />}></Route>
-              </Route>
-              <Route path={ADMIN_ROUTE_MAP.adminModule.dashboard.home}
+                path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.nocIssued}/:round`}
+                element={<NocIssued />}
+              ></Route>
+            </Route>
+            {/* Certificate management routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.certificateManagement.home}
+              element={<CertificateManagement />}
+            >
+              <Route index element={<CertificateManagementList />}></Route>
+            </Route>
+            {/* Schedule management routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.scheduleManagement.home}
+              element={<ScheduleManagement />}
+            >
+              <Route index element={<ScheduleManagementList />}></Route>
+            </Route>
+            <Route path={ADMIN_ROUTE_MAP.adminModule.dashboard.home}
               element={
                 <PrivateRoute>
                   <DashboardLandingPage />
                 </PrivateRoute>
               }
               ></Route>
+
               <Route
-                path="*"
-                element={
-                  <Navigate
-                    to={`${
-                      loggedInUser?.role === "Super-Admin"
-                        ? ADMIN_ROUTE_MAP.adminModule.manageUsers.home
-                        : ADMIN_ROUTE_MAP.adminModule.manageForms.home
-                    }`}
-                  />
-                }
-              />
+                path={ADMIN_ROUTE_MAP.adminModule.roleManagement.home}
+                element={<ManageRole />}
+              >
+                <Route index element={<ManageRolesList />}></Route>
+                <Route
+                  path={`${ADMIN_ROUTE_MAP.adminModule.roleManagement.updateRole}/:roleId?/:roleName?`}
+                  element={<CreateUpdateRole />}
+                ></Route>
+              </Route>
+
+
+             <Route path={ADMIN_ROUTE_MAP.adminModule.roleManagement.home}
+              element={
+                <PrivateRoute>
+                  <ManageRolesList />
+                </PrivateRoute>
+              }
+            ></Route>
+            </Route>  
+           case 'Desktop-Admin':
+             return <Route>          
+            {/* Notifications routing starts here */}
+            <Route
+              path={`${ADMIN_ROUTE_MAP.adminModule.notifications.home}/:notificationId?`}
+              element={<Notification />}
+            >
+              <Route index element={<NotificationsDetailedView />}></Route>
             </Route>
+            {/*Manage forms routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.manageForms.home}
+              element={<ManageForms />}
+            >
+              <Route index element={<FormsOverview />}></Route>
+              <Route
+                path={ADMIN_ROUTE_MAP.adminModule.manageForms.createForm}
+                element={<CreateForm />}
+              ></Route>
+              <Route
+                path={ADMIN_ROUTE_MAP.adminModule.manageForms.upload}
+                element={<UploadForm />}
+              ></Route>
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.manageForms.viewForm}/:formName/:formId`}
+                element={<CreateForm />}
+              ></Route>
+            </Route>
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}
+              element={<DesktopAnalysis />}
+            >
+              <Route index element={<DesktopAnalysisList />}></Route>
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.viewForm}/:formName/:formId`}
+                element={<DesktopAnalysisView />}
+              ></Route>
+            </Route>
+            {/*Ground Inspection routing starts here  */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.onGroundInspection.home}
+              element={<GroundInspectionAnalysis />}
+            >
+              <Route index element={<GroundInspectionListForms />}></Route>
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.viewForm}/:formName/:formId/:instituteName/:round/:date`}
+                element={<GroundInspectionViewForm />}
+              ></Route>
+
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.onGroundInspection.nocIssued}/:round`}
+                element={<NocIssued />}
+              ></Route>
+            </Route>
+            {/* Certificate management routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.certificateManagement.home}
+              element={<CertificateManagement />}
+            >
+              <Route index element={<CertificateManagementList />}></Route>
+            </Route>
+            {/* Schedule management routing starts here */}
+            <Route
+              path={ADMIN_ROUTE_MAP.adminModule.scheduleManagement.home}
+              element={<ScheduleManagement />}
+            >
+              <Route index element={<ScheduleManagementList />}></Route>
+            </Route>
+            <Route path={ADMIN_ROUTE_MAP.adminModule.dashboard.home}
+              element={
+                <PrivateRoute>
+                  <DashboardLandingPage />
+                </PrivateRoute>
+              }
+            ></Route>
+            </Route> 
+          case 'Desktop-Assessor':
+            return <Route>
+                <Route
+              path={ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.home}
+              element={<DesktopAnalysis />}
+            >
+              <Route index element={<DesktopAnalysisList />}></Route>
+              <Route
+                path={`${ADMIN_ROUTE_MAP.adminModule.desktopAnalysis.viewForm}/:formName/:formId`}
+                element={<DesktopAnalysisView />}
+              ></Route>
+            </Route>
+            </Route>
+          default:
+            return null
+        }
+      })()}
           </Routes>
         </BrowserRouter>
       </ContextAPI.Provider>

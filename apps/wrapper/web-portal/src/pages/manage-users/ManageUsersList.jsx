@@ -15,6 +15,11 @@ import {
   handleInctiveUser,
   handleDeleteUser,
   getAllRegulators,
+  sendEmailNotification,
+  fetchAllDeskTopAssessors,
+  handleActiveRegulatorUser,
+  handleInctiveRegulatorUser,
+  fetchAllInstitutes
 } from "../../api";
 
 import { userService } from "../../api/userService";
@@ -32,6 +37,7 @@ import {
 } from "@material-tailwind/react";
 import { ContextAPI } from "../../utils/ContextAPI";
 import ViewScheduleModal from "./ViewScheduleModal";
+import data from "../../assets/json-files/messages.json";
 
 export default function ManageUsersList({
   closeDeleteUsersModal,
@@ -40,7 +46,7 @@ export default function ManageUsersList({
   setDeleteFlags,
 }) {
   const navigation = useNavigate();
-  var resUserData = [];
+  let resUserData = [];
   const [deleteUsersModel, setDeleteUsersModel] = useState(false);
   const [deleteBulkUsersModel, setDeleteBulkUsersModel] = useState(false);
 
@@ -134,6 +140,10 @@ export default function ManageUsersList({
       accessor: "role",
     },
     {
+      Header: "Account Status",
+      accessor: "status",
+    },
+    {
       Header: "",
       accessor: "more_actions",
     },
@@ -156,76 +166,102 @@ export default function ManageUsersList({
   const handleUsersetInvalid = async (user) => {
     const userId = user?.user_id;
     const formData = new FormData();
-    formData.append("assessorId", userId);
+    if (state.menu_selected === 'Assessor') {
+      formData.append("assessorId", userId);
+    } else {
+      formData.append("requlatorId", userId);
+    }
     let e = user;
     try {
       setSpinner(true);
-      const response = await handleInctiveUser(formData);
-      e["workingstatus"] = "Invalid";
-      resUserData.forEach((item) => {
-        if (item.id === userId) {
-          item.status = "Inactive";
-          item.more_actions = (
-            <div className="flex flex-row text-2xl font-semibold">
-              <Menu placement="bottom-end">
-                <MenuHandler>
-                  <button className="leading-3 relative top-[-8px]">...</button>
-                </MenuHandler>
-                <MenuList className="p-2">
-                  <MenuItem
-                    onClick={() =>
-                      navigation(
-                        `${ADMIN_ROUTE_MAP.adminModule.manageUsers.createUser}/${e.user_id}`
-                      )
-                    }
-                  >
-                    <div className="flex flex-row gap-4 mt-4">
-                      <div>
-                        <MdEdit />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>Edit</span>
-                      </div>
-                    </div>{" "}
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() =>
-                      e?.workingstatus === "Invalid"
-                        ? handleUserSetValid(e)
-                        : handleUsersetInvalid(e)
-                    }
-                  >
-                    <div className="flex flex-row gap-4">
-                      <div>
-                        <MdSwapHoriz />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>
-                          {e?.workingstatus === "Invalid"
-                            ? "Activate"
-                            : "Deactivate"}
-                        </span>
-                      </div>
-                    </div>
-                  </MenuItem>
-                  <MenuItem onClick={() => handleUserDelete(e)}>
-                    <div className="flex flex-row gap-4">
-                      <div>
-                        <MdDelete />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>Delete</span>
-                      </div>
-                    </div>{" "}
-                  </MenuItem>
-                </MenuList>
-              </Menu>
-            </div>
-          );
+
+      const reqBody = {
+        "request": {
+          "userName": userId
         }
-      });
-      console.log("data", resUserData);
-      setUserTableList(resUserData);
+      }
+
+      const res = await userService.deActivateUserKeycloak(reqBody)
+      if(res){
+        const response = state.menu_selected === 'Assessor' ? await handleInctiveUser(formData) : await handleInctiveRegulatorUser(formData);
+        e["workingstatus"] = "Invalid";
+        resUserData.forEach((item) => {
+          if (item.id === userId) {
+            item.status = "Inactive";
+            item.more_actions = (
+              <div className="flex flex-row text-2xl font-semibold">
+                <Menu placement="bottom-end">
+                  <MenuHandler>
+                    <button className="leading-3 relative top-[-8px]">...</button>
+                  </MenuHandler>
+                  <MenuList className="p-2">
+                    <MenuItem
+                      onClick={() =>
+                        navigation(
+                          `${ADMIN_ROUTE_MAP.adminModule.manageUsers.createUser}/${e.user_id}`
+                        )
+                      }
+                    >
+                      <div className="flex flex-row gap-4 mt-4">
+                        <div>
+                          <MdEdit />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>Edit</span>
+                        </div>
+                      </div>{" "}
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() =>
+                        e?.workingstatus === "Invalid"
+                          ? handleUserSetValid(e)
+                          : handleUsersetInvalid(e)
+                      }
+                    >
+                      <div className="flex flex-row gap-4">
+                        <div>
+                          <MdSwapHoriz />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>
+                            {e?.workingstatus === "Invalid"
+                              ? "Activate"
+                              : "Deactivate"}
+                          </span>
+                        </div>
+                      </div>
+                    </MenuItem>
+                 {/*    <MenuItem onClick={() => handleUserDelete(e)}>
+                      <div className="flex flex-row gap-4">
+                        <div>
+                          <MdDelete />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>Delete</span>
+                        </div>
+                      </div>{" "}
+                    </MenuItem> */}
+                  </MenuList>
+                </Menu>
+              </div>
+            );
+          }
+        });
+       // console.log("data", resUserData);
+        setUserTableList(resUserData);
+        const userDetails = response?.data?.update_assessors?.returning[0] ? response?.data?.update_assessors?.returning[0] : response?.data?.update_regulator?.returning[0]
+        if (userDetails) {
+          sendActivationStatusNotification(userDetails, 'inactive');
+          setToast((prevState) => ({
+            ...prevState,
+            toastOpen: true,
+            toastMsg: "User deactivated successfully",
+            toastType: "success",
+          }));
+        }
+      }
+
+     
     } catch (error) {
       const errorMessage = JSON.parse(error?.config?.data).regulators[0]?.user_id?.errorMessage;
       setToast((prevState) => ({
@@ -247,75 +283,102 @@ export default function ManageUsersList({
   const handleUserSetValid = async (user) => {
     const userId = user?.user_id;
     const formData = new FormData();
-    formData.append("assessorId", userId);
+    if (state.menu_selected === 'Assessor') {
+      formData.append("assessorId", userId);
+    } else {
+      formData.append("requlatorId", userId);
+    }
     let e = user;
     try {
       setSpinner(true);
-      const validResponse = await handleActiveUser(formData);
-      e["workingstatus"] = "Valid";
-      resUserData.forEach((item) => {
-        if (item.id === userId) {
-          item.status = "Active";
-          item.more_actions = (
-            <div className="flex flex-row text-2xl font-semibold">
-              <Menu placement="bottom-end">
-                <MenuHandler>
-                  <button className="leading-3 relative top-[-8px]">...</button>
-                </MenuHandler>
-                <MenuList className="p-2">
-                  <MenuItem
-                    onClick={() =>
-                      navigation(
-                        `${ADMIN_ROUTE_MAP.adminModule.manageUsers.createUser}/${e.user_id}`
-                      )
-                    }
-                  >
-                    <div className="flex flex-row gap-4">
-                      <div>
-                        <MdEdit />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>Edit</span>
-                      </div>
-                    </div>{" "}
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() =>
-                      e?.workingstatus === "Invalid"
-                        ? handleUserSetValid(e)
-                        : handleUsersetInvalid(e)
-                    }
-                  >
-                    <div className="flex flex-row gap-4">
-                      <div>
-                        <MdSwapHoriz />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>
-                          {e?.workingstatus === "Invalid"
-                            ? "Activate"
-                            : "Deactivate"}
-                        </span>
-                      </div>
-                    </div>{" "}
-                  </MenuItem>
-                  <MenuItem onClick={() => handleUserDelete(e)}>
-                    <div className="flex flex-row gap-4">
-                      <div>
-                        <MdDelete />
-                      </div>
-                      <div className="text-semibold m-">
-                        <span>Delete</span>
-                      </div>
-                    </div>{" "}
-                  </MenuItem>
-                </MenuList>
-              </Menu>
-            </div>
-          );
+
+      const reqBody = {
+        "request": {
+          "userName": userId
         }
-      });
-      setUserTableList(resUserData);
+      }
+
+      const res = await userService.activateUserKeycloak(reqBody)
+
+      if (res.status === 200) {
+        const validResponse = state.menu_selected === 'Assessor' ? await handleActiveUser(formData) : await handleActiveRegulatorUser(formData);
+        e["workingstatus"] = "Valid";
+        resUserData.forEach((item) => {
+          if (item.id === userId) {
+            item.status = "Active";
+            item.more_actions = (
+              <div className="flex flex-row text-2xl font-semibold">
+                <Menu placement="bottom-end">
+                  <MenuHandler>
+                    <button className="leading-3 relative top-[-8px]">...</button>
+                  </MenuHandler>
+                  <MenuList className="p-2">
+                    <MenuItem
+                      onClick={() =>
+                        navigation(
+                          `${ADMIN_ROUTE_MAP.adminModule.manageUsers.createUser}/${e.user_id}`
+                        )
+                      }
+                    >
+                      <div className="flex flex-row gap-4">
+                        <div>
+                          <MdEdit />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>Edit</span>
+                        </div>
+                      </div>{" "}
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() =>
+                        e?.workingstatus === "Invalid"
+                          ? handleUserSetValid(e)
+                          : handleUsersetInvalid(e)
+                      }
+                    >
+                      <div className="flex flex-row gap-4">
+                        <div>
+                          <MdSwapHoriz />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>
+                            {e?.workingstatus === "Invalid"
+                              ? "Activate"
+                              : "Deactivate"}
+                          </span>
+                        </div>
+                      </div>{" "}
+                    </MenuItem>
+                  {/*   <MenuItem onClick={() => handleUserDelete(e)}>
+                      <div className="flex flex-row gap-4">
+                        <div>
+                          <MdDelete />
+                        </div>
+                        <div className="text-semibold m-">
+                          <span>Delete</span>
+                        </div>
+                      </div>{" "}
+                    </MenuItem> */}
+                  </MenuList>
+                </Menu>
+              </div>
+            );
+          }
+        });
+        setUserTableList(resUserData);
+        const userDetails = validResponse?.data?.update_assessors?.returning[0] ? validResponse?.data?.update_assessors?.returning[0] : validResponse?.data?.update_regulator?.returning[0]
+        if (userDetails) {
+
+          sendActivationStatusNotification(userDetails, 'active');
+          setToast((prevState) => ({
+            ...prevState,
+            toastOpen: true,
+            toastMsg: "User activated successfully",
+            toastType: "success",
+          }));
+        }
+      }
+     
     } catch (error) {
       console.log("error - ", error);
       const errorMessage = JSON.parse(error?.config?.data).regulators[0]?.user_id?.errorMessage
@@ -329,6 +392,28 @@ export default function ManageUsersList({
       setSpinner(false);
     }
   };
+
+  const sendActivationStatusNotification = async (userDetails, status) => {
+    // let mailBody = require('./json-files/mail-body.json');
+    if (userDetails.email) {
+      const emailBody = status === 'active' ? data.ACTIVATION_MAIL : data.INACTIVATION_MAIL;
+      if (state.menu_selected === 'Assessor') {
+        const emailData = {
+          recipientEmail: [`${userDetails.email}`],
+          emailSubject: `${emailBody.SUBJECT}`,
+          emailBody:  `${emailBody.BODY.part1}${userDetails.name}${emailBody.BODY.part2}`
+        };
+        // sendEmailNotification(emailData)
+      } else {
+        const emailData = {
+          recipientEmail: [`${userDetails.email}`],
+          emailSubject: `${emailBody.SUBJECT}`,
+          emailBody:  `${emailBody.BODY.part1}${userDetails.full_name}${emailBody.BODY.part2}`
+        };
+        // sendEmailNotification(emailData)
+      }
+    }
+  }
 
   const handleUserDelete = (e) => {
     setSelectedUserId(e.user_id);
@@ -400,7 +485,7 @@ export default function ManageUsersList({
                   </div>
                 </div>{" "}
               </MenuItem>
-              <MenuItem onClick={() => handleUserDelete(e)}>
+             {/*  <MenuItem onClick={() => handleUserDelete(e)}>
                 <div className="flex flex-row gap-4 p-1">
                   <div>
                     <MdDelete />
@@ -409,7 +494,7 @@ export default function ManageUsersList({
                     <span>Delete</span>
                   </div>
                 </div>{" "}
-              </MenuItem>
+              </MenuItem> */}
             </MenuList>
           </Menu>
         </div>
@@ -422,7 +507,7 @@ export default function ManageUsersList({
       full_name: e.fname || e.lname ? e.fname + " " + e.lname : e.name,
       email: e.email?.toLowerCase(),
       mobile_number: e.phonenumber,
-      role: e.role === "Desktop-Admin" ? "Admin" : "Admin",
+      role: e.role === "Desktop-Admin" ? "Admin" : "Desktop-Assessor",
       status:
         e.workingstatus === "Valid"
           ? "Active"
@@ -461,7 +546,27 @@ export default function ManageUsersList({
                   </div>
                 </div>{" "}
               </MenuItem>
-              <MenuItem onClick={() => handleUserDelete(e)}>
+              <MenuItem
+                onClick={() =>
+                  e?.workingstatus === "Invalid"
+                    ? handleUserSetValid(e)
+                    : handleUsersetInvalid(e)
+                }
+              >
+                <div className="flex flex-row gap-4 p-1">
+                  <div>
+                    <MdSwapHoriz />
+                  </div>
+                  <div className="text-semibold">
+                    <span>
+                      {e?.workingstatus === "Invalid"
+                        ? "Activate"
+                        : "Deactivate"}
+                    </span>
+                  </div>
+                </div>{" "}
+              </MenuItem>
+             {/*  <MenuItem onClick={() => handleUserDelete(e)}>
                 <div className="flex flex-row gap-4 p-1">
                   <div>
                     <MdDelete />
@@ -470,7 +575,7 @@ export default function ManageUsersList({
                     <span>Delete</span>
                   </div>
                 </div>{" "}
-              </MenuItem>
+              </MenuItem> */}
             </MenuList>
           </Menu>
         </div>
@@ -491,7 +596,7 @@ export default function ManageUsersList({
         ...prevState,
         totalCount: res.data.assessors_aggregate.aggregate.totalCount,
       }));
-      setUsersList(res?.data?.assessors);
+     // setUsersList(res?.data?.assessors);
       const data = res?.data?.assessors;
       data.forEach(setTableData);
       setUserTableList(resUserData);
@@ -514,9 +619,62 @@ export default function ManageUsersList({
         ...prevState,
         totalCount: res.data.regulator_aggregate.aggregate.totalCount,
       }));
-      setUsersList(res?.data?.regulator);
-      const data = res?.data?.regulator;
+      //setUsersList(res?.data?.regulator);
+      const data = res?.data?.regulator.reverse();
       data.forEach(setAdminTableData);
+      const newData = resUserData.filter(user => user.role === "Admin");
+      setUserTableList(newData);
+    } catch (error) {
+      console.log("error - ", error);
+    } finally {
+      setSpinner(false);
+    }
+  };
+
+  const getAllDeskTopAssessors = async () => {
+    const pagination = {
+      offsetNo: paginationInfo.offsetNo,
+      limit: paginationInfo.limit,
+      role: 'Desktop-Assessor'
+    };
+    try {
+      setSpinner(true);
+      const res = await fetchAllDeskTopAssessors(pagination);
+      setPaginationInfo((prevState) => ({
+        ...prevState,
+        totalCount: res.data.regulator_aggregate.aggregate.totalCount,
+      }));
+      console.log(res?.data?.regulator)
+     // setUsersList(res?.data?.regulator);
+      const data = res?.data?.regulator;
+      data.forEach(setTableData);
+      console.log(resUserData);
+      setUserTableList(resUserData);
+    } catch (error) {
+      console.log("error - ", error);
+    } finally {
+      setSpinner(false);
+    }
+  };
+
+  const getAllInstitutes = async () => {
+    const pagination = {
+      offsetNo: paginationInfo.offsetNo,
+      limit: paginationInfo.limit,
+      role: 'Desktop-Assessor'
+    };
+    try {
+      setSpinner(true);
+      const res = await fetchAllInstitutes(pagination);
+      setPaginationInfo((prevState) => ({
+        ...prevState,
+        totalCount: res.data.regulator_aggregate.aggregate.totalCount,
+      }));
+      console.log(res?.data?.regulator)
+     // setUsersList(res?.data?.regulator);
+      const data = res?.data?.regulator;
+      data.forEach(setTableData);
+      console.log(resUserData);
       setUserTableList(resUserData);
     } catch (error) {
       console.log("error - ", error);
@@ -539,18 +697,38 @@ export default function ManageUsersList({
           ...prevState,
           totalCount: res.data.assessors_aggregate.aggregate.totalCount,
         }));
-        setUsersList(res?.data?.assessors);
-        const data = res?.data?.assessors;
-        data.forEach(setTableData);
+       // setUsersList(res?.data?.assessors);
+        res?.data?.assessors.forEach(setTableData);
       }
       if (state.menu_selected === "Desktop-Admin") {
+       
+        const newData = res?.data?.regulator.filter(obj => {
+          return obj.role === "Desktop-Admin";
+        });
+      
+       // setUsersList(newData);
+        
+        newData.forEach(setAdminTableData);
+       
         setPaginationInfo((prevState) => ({
           ...prevState,
-          totalCount: res.data.regulator_aggregate.aggregate.totalCount,
+          totalCount: resUserData.length,
         }));
-        setUsersList(res?.data?.regulator);
-        const data = res?.data?.regulator;
-        data.forEach(setAdminTableData);
+        
+      }
+      if (state.menu_selected === "Desktop-Assessor") {
+        
+      //  setUsersList(res?.data?.regulator);
+        
+        const newData =  res?.data?.regulator.filter(obj => {
+          return obj.role === "Desktop-Assessor";
+        });
+        
+        newData.forEach(setAdminTableData);
+        setPaginationInfo((prevState) => ({
+          ...prevState,
+          totalCount: resUserData.length,
+        }));
       }
       setUserTableList(resUserData);
     } catch (error) {
@@ -573,7 +751,7 @@ export default function ManageUsersList({
         ...prevState,
         totalCount: res?.data?.assessors_aggregate?.aggregate?.totalCount,
       }));
-      setUsersList(res?.data?.assessors);
+     // setUsersList(res?.data?.assessors);
       const data = res?.data?.assessors;
       data.forEach(setTableData);
       setUserTableList(resUserData);
@@ -610,12 +788,16 @@ export default function ManageUsersList({
       if (response.status === 200) {
         hasuraResponse = await handleDeleteUser(hasuraPostData);
       }
-      if (state.menu_selected === "Assessor") {
+     /*  if (state.menu_selected === "Assessor") {
         await fetchAllAssessors();
       }
       if (state.menu_selected === "Desktop-Admin") {
         await fetchAllRegulators();
       }
+      if (state.menu_selected === "Desktop-Assessor") {
+        await getAllDeskTopAssessors();
+      } */
+      getUsersBasedOnMenuSelected();
       setDeleteFlag(false);
       setSelectedUserId([]);
 
@@ -729,28 +911,77 @@ export default function ManageUsersList({
     }
   };
   const handleUserStatus = async (selectedRows) => {
-    for (let x in selectedRows) {
-      if (selectedRows[x].status.toLowerCase() === "active") {
-        const postData = { assessorId: selectedRows[x].user_id };
-        const validResponse = await handleInctiveUser(postData);
-
-        // resUserData.forEach((item) => {
-        //   if (item.id === selectedRows[x].user_id) {
-        //     item.status = "Inactive";
-        //   }
-        // });
-      } else if (selectedRows[x].status.toLowerCase() === "inactive") {
-        const postData = { assessorId: selectedRows[x].user_id };
-        const validResponse = await handleActiveUser(postData);
-        // resUserData.forEach((item) => {
-        //   if (item.id === selectedRows[x].user_id) {
-        //     item.status = "Active";
-        //   }
-        // });
+    console.log("menuSelected =>", state.menu_selected);
+    switch(state.menu_selected) {
+      case 'Assessor': 
+      for (let x in selectedRows) {
+        if (selectedRows[x].status.toLowerCase() === "active") {
+          const postData = { assessorId: selectedRows[x].user_id };
+          const validResponse = await handleInctiveUser(postData);  
+        } else if (selectedRows[x].status.toLowerCase() === "inactive") {
+          const postData = { assessorId: selectedRows[x].user_id };
+          const validResponse = await handleActiveUser(postData);
+        }
       }
+      await fetchAllAssessors();
+      break;
+      case 'Desktop-Admin': 
+      for (let x in selectedRows) {
+        if (selectedRows[x].status.toLowerCase() === "active") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleInctiveRegulatorUser(postData);  
+        } else if (selectedRows[x].status.toLowerCase() === "inactive") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleActiveRegulatorUser(postData);
+        }
+      }
+      await getAllRegulators();
+      break;
+      case 'Desktop-Assessor': 
+      for (let x in selectedRows) {
+        if (selectedRows[x].status.toLowerCase() === "active") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleInctiveRegulatorUser(postData);  
+        } else if (selectedRows[x].status.toLowerCase() === "inactive") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleActiveRegulatorUser(postData);
+        }
+      }
+      await getAllDeskTopAssessors();
+      break;
+      case 'Applicant': 
+      alert('query to be added');
+      await getAllInstitutes();
+      break;
+      case 'OGA Scheduler': 
+      for (let x in selectedRows) {
+        if (selectedRows[x].status.toLowerCase() === "active") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleInctiveRegulatorUser(postData);  
+        } else if (selectedRows[x].status.toLowerCase() === "inactive") {
+          const postData = { requlatorId: selectedRows[x].user_id };
+          const validResponse = await handleActiveRegulatorUser(postData);
+        }
+      }
+      // await getAllRegulators();
+      break;
+      case 'Report Analyst':
+        for (let x in selectedRows) {
+          if (selectedRows[x].status.toLowerCase() === "active") {
+            const postData = { requlatorId: selectedRows[x].user_id };
+            const validResponse = await handleInctiveRegulatorUser(postData);  
+          } else if (selectedRows[x].status.toLowerCase() === "inactive") {
+            const postData = { requlatorId: selectedRows[x].user_id };
+            const validResponse = await handleActiveRegulatorUser(postData);
+          }
+        }
+        // await getAllRegulators();
+      break;
+      default: 
+      return;
     }
-    await fetchAllAssessors();
-    // setUserTableList(resUserData);
+    
+   
   };
 
   useEffect(() => {
@@ -766,25 +997,53 @@ export default function ManageUsersList({
     }
   }, [bulkDeleteFlag]);
 
+  const getUsersBasedOnMenuSelected = () =>{
+    switch (state.menu_selected) {
+      case 'Assessor':
+        fetchAllAssessors();
+        break;
+       case 'Desktop-Admin':
+        fetchAllRegulators();
+        break;
+      case 'Desktop-Assessor':
+        getAllDeskTopAssessors();
+        break;
+      case 'Applicant':
+        // getAllInstitutes();
+        break;
+      default:
+       // return null
+    }
+  }
+
   useEffect(() => {
     if (!isSearchOpen && !isFilterOpen) {
-      if (state.menu_selected === "Assessor") {
+      console.log(state.menu_selected)
+      /* if (state.menu_selected === "Assessor") {
         fetchAllAssessors();
       }
       if (state.menu_selected === "Desktop-Admin") {
         fetchAllRegulators();
       }
+      if (state.menu_selected === "Desktop-Assessor") {
+        getAllDeskTopAssessors();
+      } */
+      getUsersBasedOnMenuSelected();
     }
   }, [paginationInfo.offsetNo, paginationInfo.limit, state.menu_selected]);
 
   useEffect(() => {
     if (usersCreated) {
-      if (state.menu_selected === "Assessor") {
+   /*    if (state.menu_selected === "Assessor") {
         fetchAllAssessors();
       }
       if (state.menu_selected === "Desktop-Admin") {
         fetchAllRegulators();
       }
+      if (state.menu_selected === "Desktop-Assessor") {
+        getAllDeskTopAssessors();
+      } */
+      getUsersBasedOnMenuSelected();
     }
     setUsersCreated(false);
   }, [usersCreated]);
@@ -802,7 +1061,7 @@ export default function ManageUsersList({
               </div>
               <div className="flex justify-end">
                 <span className="flex gap-4">
-                  {state.menu_selected === "Assessor" && (
+                  {/* {state.menu_selected === "Assessor" && ( */}
                     <Button
                       otherProps={{
                         disabled: listArray == 0 ? true : false,
@@ -819,8 +1078,8 @@ export default function ManageUsersList({
                       }}
                       text="Make Active/Inactive"
                     ></Button>
-                  )}
-                  <Button
+                  {/* )} */}
+                  {/* <Button
                     // moreClass="text-white"
                     otherProps={{
                       disabled: listArray == 0 ? true : false,
@@ -836,7 +1095,7 @@ export default function ManageUsersList({
                         : setDeleteBulkUsersModel(false)
                     }
                     text="Delete user"
-                  ></Button>
+                  ></Button> */}
                   <button
                     onClick={() => setBulkUploadUsersModel(true)}
                     className="flex flex-wrap items-center justify-center gap-2 border border-gray-500 text-gray-900 bg-white w-[200px] h-[45px] text-md font-medium rounded-[4px]"
@@ -889,6 +1148,77 @@ export default function ManageUsersList({
                     Admin
                   </a>
                 </li>
+
+                <li
+                  className="mr-2"
+                  onClick={() => handleSelectMenu("Desktop-Assessor")}
+                >
+                  <a
+                    href="#"
+                    className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
+                      state.menu_selected === "Desktop-Assessor"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : ""
+                    }`}
+                    aria-current="page"
+                  >
+                    Desktop Assessor
+                  </a>
+                </li>
+                <li
+             //  style={{display:'none'}}
+                  className="mr-2"
+                  onClick={() => handleSelectMenu("Applicant")}
+                >
+                  <a 
+                    href="#"
+                    className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
+                      state.menu_selected === "Applicant"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : ""
+                    }`}
+                    aria-current="page"
+                  >
+                    Applicant
+                  </a>
+                </li>
+
+                <li
+             //  style={{display:'none'}}
+                  className="mr-2"
+                  onClick={() => handleSelectMenu("OGA Scheduler")}
+                >
+                  <a 
+                    href="#"
+                    className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
+                      state.menu_selected === "OGA Scheduler"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : ""
+                    }`}
+                    aria-current="page"
+                  >
+                    OGA Scheduler
+                  </a>
+                </li>
+
+                <li
+             //  style={{display:'none'}}
+                  className="mr-2"
+                  onClick={() => handleSelectMenu("Report Analyst")}
+                >
+                  <a 
+                    href="#"
+                    className={`inline-block p-4 rounded-t-lg dark:text-blue-500 dark:border-blue-600 ${
+                      state.menu_selected === "Report Analyst"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : ""
+                    }`}
+                    aria-current="page"
+                  >
+                    Report Analyst
+                  </a>
+                </li>
+                
               </ul>
               {/* filtering table here */}
               {state.menu_selected === "Assessor" && (
@@ -913,6 +1243,49 @@ export default function ManageUsersList({
                 </div>
               )}
               {state.menu_selected === "Desktop-Admin" && (
+                <div className="flex flex-col gap-3">
+                  <FilteringTable
+                    dataList={userTableList}
+                    columns={ADMIN_COLUMN}
+                    navigateFunc={() => {}}
+                    showCheckbox={true}
+                    paginationInfo={paginationInfo}
+                    setPaginationInfo={setPaginationInfo}
+                    setOnRowSelect={() => {}}
+                    setSelectedRows={setSelectedRows}
+                    showFilter={false}
+                    showSearch={true}
+                    pagination={true}
+                    filterApiCall={filterApiCall}
+                    searchApiCall={searchApiCall}
+                    setIsSearchOpen={setIsSearchOpen}
+                    setIsFilterOpen={setIsFilterOpen}
+                  />
+                </div>
+              )}
+               
+               {state.menu_selected === "Desktop-Assessor" && (
+                <div className="flex flex-col gap-3">
+                  <FilteringTable
+                    dataList={userTableList}
+                    columns={ADMIN_COLUMN}
+                    navigateFunc={() => {}}
+                    showCheckbox={true}
+                    paginationInfo={paginationInfo}
+                    setPaginationInfo={setPaginationInfo}
+                    setOnRowSelect={() => {}}
+                    setSelectedRows={setSelectedRows}
+                    showFilter={false}
+                    showSearch={true}
+                    pagination={true}
+                    filterApiCall={filterApiCall}
+                    searchApiCall={searchApiCall}
+                    setIsSearchOpen={setIsSearchOpen}
+                    setIsFilterOpen={setIsFilterOpen}
+                  />
+                </div>
+              )}
+              {state.menu_selected === "Applicant" && (
                 <div className="flex flex-col gap-3">
                   <FilteringTable
                     dataList={userTableList}
